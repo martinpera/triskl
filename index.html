@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>triskl — acceso</title>
+  <link rel="icon" href="logotriskl.png" type="image/png">
+  <style>
+    :root {
+      --bg:       #111111;
+      --border:   #2A2A2A;
+      --input:    #1C1C1C;
+      --white:    #EFEFEF;
+      --muted:    #555555;
+      --dim:      #2A2A2A;
+      --red:      #D93025;
+      --red-dark: #AA1A10;
+      --green:    #2ECC71;
+      --gold:     #F5A623;
+      --blue:     #5B9CF6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,.018) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,.018) 40px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .window {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 520px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      box-shadow: 0 32px 80px rgba(0,0,0,.6);
+      display: flex;
+      overflow: hidden;
+      animation: slideUp .35s cubic-bezier(.22,.68,0,1.2) both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .accent { width: 4px; background: var(--red); flex-shrink: 0; }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 44px 48px 36px;
+    }
+
+    .brand-row { display: flex; align-items: center; gap: 14px; }
+
+    .logo {
+      width: 46px; height: 46px;
+      flex-shrink: 0;
+      display: grid; place-items: center;
+      overflow: hidden;
+    }
+    .logo img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+    }
+    .logo-fallback {
+      width: 46px; height: 46px;
+      background: var(--red);
+      display: none;
+      place-items: center;
+      font-size: 22px; font-weight: 900; color: #fff;
+      letter-spacing: -2px;
+      flex-shrink: 0;
+    }
+
+    .brand-name { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+    .version    { margin-top: 3px; color: var(--muted); font-size: 11px; }
+
+    .line { height: 1px; background: var(--border); margin: 20px 0 22px; }
+
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+    .tab {
+      border: 0; padding: 9px 18px;
+      background: var(--dim); color: var(--muted);
+      font-weight: 700; font-size: 14px; cursor: pointer;
+      transition: background .15s, color .15s;
+      font-family: inherit;
+    }
+    .tab.active { background: var(--red); color: #fff; }
+
+    .field { margin-bottom: 14px; }
+    label {
+      display: block; color: var(--muted); font-size: 10px;
+      font-weight: 800; letter-spacing: .9px; text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    input[type=text], input[type=email], input[type=password], select {
+      width: 100%;
+      background: var(--input); color: var(--white);
+      border: 1px solid transparent; outline: none;
+      padding: 13px 14px; font-size: 14px;
+      transition: border-color .15s;
+      font-family: inherit;
+    }
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23555555' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+    input:focus, select:focus { border-color: var(--red); }
+
+    input.otp-input {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 10px;
+      text-align: center;
+      padding: 16px;
+    }
+
+    .terms-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin-bottom: 14px; margin-top: 2px;
+    }
+    .terms-row input[type=checkbox] {
+      width: 16px; height: 16px; margin-top: 2px;
+      accent-color: var(--red); cursor: pointer;
+      flex-shrink: 0;
+    }
+    .terms-label {
+      font-size: 12px; color: var(--muted); line-height: 1.5; cursor: default;
+    }
+    .terms-link {
+      color: var(--blue); text-decoration: underline;
+      cursor: pointer; font-size: 12px;
+      transition: color .15s;
+    }
+    .terms-link:hover { color: var(--white); }
+
+    .msg {
+      min-height: 20px;
+      font-size: 12px; line-height: 1.45;
+      margin: 2px 0 12px;
+      white-space: pre-wrap;
+      color: var(--red);
+      transition: color .15s;
+    }
+    .msg.ok   { color: var(--green); }
+    .msg.info { color: var(--blue); }
+
+    .btn-primary {
+      width: 100%; border: 0;
+      background: var(--red); color: #fff;
+      font-size: 15px; font-weight: 800;
+      padding: 15px; cursor: pointer;
+      transition: background .15s;
+      font-family: inherit;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--red-dark); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: none; border: 0;
+      color: var(--blue); font-size: 12px;
+      cursor: pointer; padding: 4px 0;
+      font-family: inherit;
+      text-decoration: underline;
+      text-align: left;
+    }
+
+    .otp-hint {
+      color: var(--muted); font-size: 13px; line-height: 1.5;
+      margin-bottom: 4px;
+    }
+    .otp-email { color: var(--gold); font-weight: 700; }
+
+    .footer-note {
+      margin-top: 20px;
+      color: var(--muted); font-size: 11px;
+      text-align: center;
+    }
+
+    .gen-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    @media (max-width: 540px) {
+      body { padding: 0; align-items: stretch; }
+      .window { min-height: 100dvh; border: 0; max-width: none; }
+      .content { padding: 38px 28px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<main class="window">
+  <div class="accent"></div>
+  <section class="content">
+
+    <header>
+      <div class="brand-row">
+        <div class="logo" id="logoWrap">
+          <img src="/logotriskl.png" alt="triskl"
+               onerror="this.parentElement.style.display='none';document.getElementById('logoFallback').style.display='grid';"/>
+        </div>
+        <div class="logo-fallback" id="logoFallback">t</div>
+        <div>
+          <div class="brand-name">triskl</div>
+          <div class="version">versión 1.9</div>
+        </div>
+      </div>
+      <div class="line"></div>
+    </header>
+
+    <div id="authSection">
+      <nav class="tabs">
+        <button class="tab active" id="tabLogin" type="button">Iniciar sesión</button>
+        <button class="tab" id="tabRegister" type="button">Crear cuenta</button>
+      </nav>
+
+      <div class="field" id="usernameBox" style="display:none">
+        <label for="username">Nombre de usuario</label>
+        <input id="username" type="text" autocomplete="username" placeholder="usuario" />
+        <div class="gen-hint">Solo letras, números, puntos y guiones bajos. No puede terminar con punto.</div>
+      </div>
+
+      <div class="field" id="genBox" style="display:none">
+        <label for="gen">Generación</label>
+        <select id="gen">
+          <option value="">Seleccioná tu año de ingreso</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="email"
+               placeholder="usuario@stellamaris.edu.uy" />
+      </div>
+
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+      </div>
+
+      <div class="terms-row" id="termsRow" style="display:none">
+        <input type="checkbox" id="termsCheck"/>
+        <span class="terms-label">
+          Acepto los
+          <a class="terms-link"
+             href="http://pera.com.uy/data/internal/triskl/terms.txt"
+             target="_blank" rel="noopener">términos y condiciones</a>
+        </span>
+      </div>
+
+      <p class="msg" id="authMsg"></p>
+      <button class="btn-primary" id="submitBtn" type="button">Entrar</button>
+    </div>
+
+    <div id="otpSection" style="display:none">
+      <p class="otp-hint">
+        Enviamos un código de verificación a<br>
+        <span class="otp-email" id="otpEmailLabel"></span>
+      </p>
+
+      <div class="field" style="margin-top:14px">
+        <label>Código de verificación</label>
+        <input id="otpInput" type="text" class="otp-input"
+               maxlength="6" placeholder="000000"
+               autocomplete="one-time-code" inputmode="numeric" />
+      </div>
+
+      <p class="msg" id="otpMsg"></p>
+      <button class="btn-primary" id="otpSubmitBtn" type="button">Verificar</button>
+      <br>
+      <button class="btn-ghost" id="otpResendBtn" type="button" style="margin-top:10px">
+        ↺ Reenviar código
+      </button>
+      <br>
+      <button class="btn-ghost" id="otpBackBtn" type="button" style="margin-top:5px">
+        ← Volver
+      </button>
+    </div>
+
+  </section>
+</main>
+
+<script>
+const API    = "/api/handler";
+const LS_KEY = "triskl_session";
+
+const ALLOWED_EMAIL_DOMAINS = [
+  "@stellamaris.edu.uy",
+  "@british.edu.uy",
+  "@pera.com.uy"
+];
+
+const tabLogin      = document.getElementById("tabLogin");
+const tabRegister   = document.getElementById("tabRegister");
+const usernameBox   = document.getElementById("usernameBox");
+const genBox        = document.getElementById("genBox");
+const genSelect     = document.getElementById("gen");
+const termsRow      = document.getElementById("termsRow");
+const termsCheck    = document.getElementById("termsCheck");
+const emailInput    = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const usernameInput = document.getElementById("username");
+const authMsg       = document.getElementById("authMsg");
+const submitBtn     = document.getElementById("submitBtn");
+const authSection   = document.getElementById("authSection");
+const otpSection    = document.getElementById("otpSection");
+const otpInput      = document.getElementById("otpInput");
+const otpMsg        = document.getElementById("otpMsg");
+const otpSubmitBtn  = document.getElementById("otpSubmitBtn");
+const otpResendBtn  = document.getElementById("otpResendBtn");
+const otpBackBtn    = document.getElementById("otpBackBtn");
+const otpEmailLabel = document.getElementById("otpEmailLabel");
+
+let mode = "login";
+let pendingEmail = "";
+let pendingPassword = "";
+let pendingUsername = "";
+let pendingGen = null;
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function isAllowedSchoolEmail(email) {
+  const clean = normalizeEmail(email);
+  return ALLOWED_EMAIL_DOMAINS.some(domain => clean.endsWith(domain));
+}
+
+// Validación de nombre de usuario: solo permite letras, números, puntos y guiones bajos
+// Reglas: 
+// 1. Solo caracteres: a-z, A-Z, 0-9, ., _
+// 2. No puede terminar con punto
+// 3. Mínimo 3 caracteres, máximo 30
+function isValidUsername(username) {
+  if (!username || username.length < 3 || username.length > 30) {
+    return false;
+  }
+  
+  // Permitir: letras (mayúsculas/minúsculas), números, punto, guión bajo
+  const allowedRegex = /^[a-zA-Z0-9._]+$/;
+  if (!allowedRegex.test(username)) {
+    return false;
+  }
+  
+  // No puede terminar con punto
+  if (username.endsWith('.')) {
+    return false;
+  }
+  
+  // No puede tener puntos consecutivos (opcional pero buena práctica)
+  if (username.includes('..')) {
+    return false;
+  }
+  
+  return true;
+}
+
+function setMsg(el, text, type = "error") {
+  el.textContent = text;
+  el.className = "msg" + (type === "ok" ? " ok" : type === "info" ? " info" : "");
+}
+
+function setLoading(btn, loading, text) {
+  btn.disabled = loading;
+  if (text) btn.textContent = text;
+}
+
+async function apiPost(action, body) {
+  const res = await fetch(`${API}?action=${encodeURIComponent(action)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, data };
+}
+
+function saveSession(data, password) {
+  localStorage.setItem(LS_KEY, JSON.stringify({ ...data, password }));
+}
+
+function goToDashboard() {
+  window.location.href = "/social";
+}
+
+function backToLogin() {
+  authSection.style.display = "block";
+  otpSection.style.display = "none";
+  otpInput.value = "";
+  setMsg(otpMsg, "");
+  pendingEmail = "";
+  pendingPassword = "";
+  pendingUsername = "";
+  pendingGen = null;
+  setMode("login");
+}
+
+function populateGenSelect() {
+  const currentYear = new Date().getFullYear();
+  genSelect.innerHTML = '<option value="">Seleccioná tu generación</option>';
+  for (let year = currentYear; year >= 2008; year--) {
+    const option = document.createElement("option");
+    option.value = year;
+    option.textContent = `${year}`;
+    genSelect.appendChild(option);
+  }
+}
+
+function setMode(next) {
+  mode = next;
+  setMsg(authMsg, "");
+  if (mode === "login") {
+    tabLogin.classList.add("active");
+    tabRegister.classList.remove("active");
+    usernameBox.style.display = "none";
+    genBox.style.display = "none";
+    termsRow.style.display = "none";
+    submitBtn.textContent = "Entrar";
+    passwordInput.setAttribute("autocomplete", "current-password");
+  } else {
+    tabLogin.classList.remove("active");
+    tabRegister.classList.add("active");
+    usernameBox.style.display = "block";
+    genBox.style.display = "block";
+    termsRow.style.display = "flex";
+    submitBtn.textContent = "Crear cuenta";
+    passwordInput.setAttribute("autocomplete", "new-password");
+    populateGenSelect();
+  }
+}
+
+// Función para limpiar el username en tiempo real (opcional)
+function sanitizeUsernameInput() {
+  let val = usernameInput.value;
+  // Remover caracteres no permitidos en tiempo real
+  val = val.replace(/[^a-zA-Z0-9._]/g, '');
+  // Evitar puntos consecutivos (opcional)
+  val = val.replace(/\.\.+/g, '.');
+  usernameInput.value = val;
+}
+
+// Aplicar sanitización en tiempo real
+usernameInput.addEventListener('input', sanitizeUsernameInput);
+
+tabLogin.addEventListener("click", () => setMode("login"));
+tabRegister.addEventListener("click", () => setMode("register"));
+otpBackBtn.addEventListener("click", backToLogin);
+
+// Auto-login
+(async () => {
+  const raw = localStorage.getItem(LS_KEY);
+  if (!raw) return;
+  try {
+    const sess = JSON.parse(raw);
+    if (!sess?.email || !isAllowedSchoolEmail(sess.email)) {
+      localStorage.removeItem(LS_KEY); 
+      return;
+    }
+    const { ok, data } = await apiPost("verify-session", {
+      email: sess.email, 
+      password: sess.password, 
+      jwt: sess.jwt,
+    });
+    if (ok && data?.id) { 
+      saveSession(data, sess.password); 
+      goToDashboard(); 
+    } else {
+      localStorage.removeItem(LS_KEY);
+    }
+  } catch (_) { 
+    localStorage.removeItem(LS_KEY); 
+  }
+})();
+
+try {
+  const stored = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+  if (stored?.email && isAllowedSchoolEmail(stored.email)) {
+    emailInput.value = stored.email;
+  }
+} catch (_) {}
+
+submitBtn.addEventListener("click", async () => {
+  const email    = normalizeEmail(emailInput.value);
+  const password = passwordInput.value;
+  const username = usernameInput.value.trim();
+  const genValue = genSelect.value;
+
+  if (mode === "register" && !username) {
+    return setMsg(authMsg, "Ingresá un nombre de usuario.");
+  }
+
+  if (mode === "register" && !isValidUsername(username)) {
+    return setMsg(authMsg, "Nombre de usuario inválido. Usá solo letras, números, puntos y guiones bajos (mínimo 3 caracteres). No puede terminar con punto.");
+  }
+
+  if (!email) {
+    return setMsg(authMsg, "Ingresá tu email.");
+  }
+
+  if (!isAllowedSchoolEmail(email)) {
+    return setMsg(authMsg, "Solo se permiten emails del colegio.");
+  }
+
+  if (!password) {
+    return setMsg(authMsg, "Ingresá tu contraseña.");
+  }
+
+  if (mode === "register" && password.length < 6) {
+    return setMsg(authMsg, "La contraseña debe tener al menos 6 caracteres.");
+  }
+
+  if (mode === "register") {
+    const currentYear = new Date().getFullYear();
+    const genNum = parseInt(genValue);
+    if (!genValue || isNaN(genNum) || genNum < 2008 || genNum > currentYear) {
+      return setMsg(authMsg, `Seleccioná un año entre 2008 y ${currentYear}.`);
+    }
+    pendingGen = genNum;
+    
+    if (!termsCheck.checked) {
+      return setMsg(authMsg, "Tenés que aceptar los términos y condiciones para crear una cuenta.");
+    }
+  }
+
+  setMsg(authMsg, "");
+  setLoading(submitBtn, true, mode === "login" ? "Verificando…" : "Registrando…");
+
+  try {
+    if (mode === "login") {
+      const { ok, data } = await apiPost("login", { email, password });
+      if (!ok) {
+        return setMsg(authMsg, data.error || "Error al iniciar sesión.");
+      }
+      saveSession(data, password);
+      setMsg(authMsg, "✓ Sesión iniciada. Entrando…", "ok");
+      setTimeout(goToDashboard, 500);
+    } else {
+      // Registrar con nombre de usuario validado
+      const { ok, data } = await apiPost("register", { 
+        email, 
+        password, 
+        username: username.toLowerCase(),
+        gen: pendingGen
+      });
+      
+      if (!ok) {
+        return setMsg(authMsg, data.error || "Error al registrarse.");
+      }
+      
+      if (data.needsVerification) {
+        pendingEmail    = email;
+        pendingPassword = password;
+        pendingUsername = username;
+        otpEmailLabel.textContent = email;
+        authSection.style.display = "none";
+        otpSection.style.display  = "block";
+        setMsg(otpMsg, data.message || "Revisá tu email. Ingresá el código de verificación.", "info");
+      } else {
+        saveSession(data, password);
+        setMsg(authMsg, "✓ Cuenta creada. Entrando…", "ok");
+        setTimeout(goToDashboard, 500);
+      }
+    }
+  } catch (err) {
+    setMsg(authMsg, "Error: " + err.message);
+  } finally {
+    setLoading(submitBtn, false, mode === "login" ? "Entrar" : "Crear cuenta");
+  }
+});
+
+[emailInput, passwordInput, usernameInput].forEach(el => {
+  el.addEventListener("keydown", e => { 
+    if (e.key === "Enter") submitBtn.click(); 
+  });
+});
+
+otpSubmitBtn.addEventListener("click", async () => {
+  const token = otpInput.value.trim();
+  
+  if (!pendingEmail || !isAllowedSchoolEmail(pendingEmail)) {
+    backToLogin();
+    return setMsg(authMsg, "El email no pertenece a una institución permitida.");
+  }
+  
+  if (!token) {
+    return setMsg(otpMsg, "Ingresá el código de verificación.");
+  }
+  
+  setLoading(otpSubmitBtn, true, "Verificando…");
+  setMsg(otpMsg, "");
+  
+  try {
+    const { ok, data } = await apiPost("verify-otp", { 
+      email: pendingEmail, 
+      token: token 
+    });
+    
+    if (!ok) {
+      setMsg(otpMsg, data.error || "Código incorrecto. Intentá nuevamente.");
+      return setLoading(otpSubmitBtn, false, "Verificar");
+    }
+    
+    saveSession(data, pendingPassword);
+    setMsg(otpMsg, "✓ Email verificado. Entrando…", "ok");
+    setTimeout(goToDashboard, 600);
+    
+  } catch (err) {
+    setMsg(otpMsg, "Error: " + err.message);
+    setLoading(otpSubmitBtn, false, "Verificar");
+  }
+});
+
+otpResendBtn.addEventListener("click", async () => {
+  if (!pendingEmail || !isAllowedSchoolEmail(pendingEmail)) {
+    return setMsg(otpMsg, "No estás usando un mail permitido.");
+  }
+  
+  setMsg(otpMsg, "Reenviando código…", "info");
+  
+  try {
+    const { ok, data } = await apiPost("resend-otp", { email: pendingEmail });
+    if (ok) {
+      setMsg(otpMsg, "✓ Código reenviado. Revisá tu email.", "ok");
+    } else {
+      setMsg(otpMsg, data.error || "Error al reenviar el código.", "error");
+    }
+  } catch (err) {
+    setMsg(otpMsg, "Error: " + err.message);
+  }
+});
+
+otpInput.addEventListener("keydown", e => { 
+  if (e.key === "Enter") otpSubmitBtn.click(); 
+});
+</script>
+</body>
+</html>
