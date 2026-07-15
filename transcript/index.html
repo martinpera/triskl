@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<meta name="theme-color" content="#0a0a0a"/>
+<link rel="icon" type="image/png" href="/logotriskl.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<title>triskl – transcribir</title>
+<style>
+:root {
+  --bg: #0a0a0a; --surface: #111111; --card: #161616;
+  --border: #1f1f1f; --border-hi: #2a2a2a;
+  --white: #f2ede8; --muted: #4a4a4a; --dim: #1a1a1a;
+  --accent: #c8402a; --accent-dk: #a32f1e; --accent-glow: rgba(200,64,42,.18);
+  --green: #2dc96e; --gold: #e0981c; --blue: #4a8ff0;
+  --f: 'Syne', sans-serif; --mono: 'JetBrains Mono', monospace;
+  --bar-h: 70px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; height: 100dvh; background: var(--bg); color: var(--white); font-family: var(--f); -webkit-font-smoothing: antialiased; overflow: hidden; }
+.app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+
+.topbar {
+  flex-shrink: 0; height: var(--bar-h);
+  background: rgba(10,10,10,.95); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; gap: 16px;
+}
+.logo-area {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  cursor: pointer;
+  background: rgba(200,64,42,.08);
+  padding: 8px 16px;
+  border-radius: 14px;
+  transition: all .2s ease;
+}
+.logo-area:hover {
+  background: rgba(200,64,42,.18);
+  transform: scale(1.02);
+}
+.logo-img {
+  width: 42px; height: 42px; object-fit: contain;
+  border-radius: 10px;
+}
+.logo-text {
+  font-size: 26px; font-weight: 900; letter-spacing: -0.5px;
+  color: #FFFFFF;
+  text-shadow: 0 2px 4px rgba(0,0,0,.3);
+  font-family: var(--f);
+}
+@media (max-width: 565px) {
+  .logo-area { display: none; }
+  .topbar { padding: 0 12px; }
+  .top-center { justify-content: flex-start; flex: none; }
+}
+.top-center {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; padding: 8px 16px; border-radius: 12px;
+  transition: background .12s;
+  background: rgba(255,255,255,.03);
+}
+.top-center:hover { background: rgba(255,255,255,.08); }
+.materia-label {
+  font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px;
+  color: var(--white);
+}
+.materia-label svg { width: 14px; height: 14px; color: var(--muted); }
+.word-chip {
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 99px; padding: 6px 16px;
+  font-size: 13px; font-family: var(--mono); color: var(--white);
+  white-space: nowrap; flex-shrink: 0;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.scroll {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 20px 16px 8px;
+}
+.scroll::-webkit-scrollbar { width: 4px; }
+.scroll::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+.placeholder {
+  color: var(--muted); font-size: 15px; line-height: 1.7;
+  text-align: center; margin-top: 80px; padding: 0 28px;
+}
+.placeholder svg { width: 48px; height: 48px; opacity: .15; margin: 0 auto 20px; display: block; }
+
+.seg { margin-bottom: 20px; animation: segIn .2s ease both; }
+@keyframes segIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.seg-ts { display: block; font-size: 10px; color: var(--accent); font-family: var(--mono); margin-bottom: 6px; font-weight: 500; letter-spacing: 0.3px; }
+.seg-text { font-size: 17px; line-height: 1.65; font-weight: 500; color: rgba(255,255,255,.92); white-space: pre-wrap; }
+.seg.is-note .seg-ts { color: var(--gold); }
+.seg.is-note .seg-text { color: var(--gold); font-style: italic; }
+.seg-interim { font-size: 16px; color: var(--muted); font-style: italic; margin-bottom: 16px; animation: none; background: rgba(255,255,255,.02); padding: 8px 12px; border-radius: 12px; }
+
+.bottom {
+  flex-shrink: 0; background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 14px 18px;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
+
+.lang-row {
+  display: flex; gap: 6px; margin-bottom: 12px;
+  background: var(--dim); border: 1px solid var(--border);
+  border-radius: 12px; padding: 4px;
+}
+.lang-opt {
+  flex: 1; height: 34px; border-radius: 9px;
+  background: none; border: 0; color: var(--muted);
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s; text-align: center;
+}
+.lang-opt.on { background: var(--accent); color: #fff; }
+
+.act-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.act-btn {
+  flex: 1; height: 42px; display: flex; align-items: center;
+  justify-content: center; gap: 8px;
+  background: var(--dim); border: 1px solid var(--border);
+  color: var(--muted); font-size: 13px; font-weight: 700;
+  font-family: var(--f); cursor: pointer; border-radius: 10px;
+  transition: all .15s;
+}
+.act-btn:hover { color: var(--white); border-color: var(--accent); background: rgba(200,64,42,.1); }
+.act-btn.pub { color: var(--gold); border-color: rgba(224,152,28,.3); }
+.act-btn.pub:hover { color: #fff; background: rgba(224,152,28,.15); }
+.act-btn.boost.on { color: var(--blue); border-color: rgba(74,143,240,.45); background: rgba(74,143,240,.14); }
+.act-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.act-row2 { display: flex; gap: 8px; margin-bottom: 12px; }
+
+.rec-btn {
+  width: 100%; height: 64px; border: 0;
+  border-radius: 14px; font-family: var(--f);
+  font-size: 17px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  cursor: pointer; transition: all .12s; user-select: none;
+}
+.rec-btn:active { transform: scale(.97); }
+.rec-btn.idle { background: var(--accent); color: #fff; box-shadow: 0 4px 20px rgba(200,64,42,.4); }
+.rec-btn.idle:hover { background: var(--accent-dk); box-shadow: 0 0 0 5px var(--accent-glow); }
+.rec-btn.rec { background: rgba(200,64,42,.12); color: var(--accent); border: 2px solid var(--accent); backdrop-filter: blur(4px); }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.rec-btn.rec .rec-dot { animation: blink 1.2s ease infinite; }
+@keyframes blink { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .2; transform: scale(.6); } }
+
+.status-line {
+  text-align: center; font-size: 12px; color: var(--muted);
+  margin-top: 10px; font-family: var(--mono); min-height: 16px;
+  font-weight: 500;
+}
+.status-line.on { color: var(--green); }
+.status-line.err { color: var(--accent); }
+
+.overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.85); backdrop-filter: blur(8px);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: fadeIn .18s ease both;
+}
+.overlay.h { display: none; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.sheet {
+  width: 100%; max-width: 540px;
+  background: var(--card); border: 1px solid var(--border-hi);
+  border-bottom: 0; border-radius: 20px 20px 0 0;
+  padding: 28px 22px calc(28px + env(safe-area-inset-bottom));
+  animation: slideUp .22s cubic-bezier(.22,.68,0,1.2) both;
+  max-height: 85vh; overflow-y: auto;
+}
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@media (min-width: 540px) {
+  .overlay { align-items: center; padding: 24px; }
+  .sheet { border-radius: 20px; border-bottom: 1px solid var(--border-hi); }
+}
+
+.sheet-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.sheet-title { font-size: 18px; font-weight: 800; }
+.sheet-close {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: var(--dim); border: 1px solid var(--border);
+  color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.sheet-close svg { width: 16px; height: 16px; }
+
+.mat-list { max-height: 40vh; overflow-y: auto; margin-bottom: 16px; }
+.mat-list::-webkit-scrollbar { display: none; }
+.mat-opt {
+  width: 100%; background: none; border: 0;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+  text-align: left; font-family: var(--f); font-size: 15px;
+  color: var(--white); padding: 14px 6px;
+  transition: all .15s;
+}
+.mat-opt:last-child { border-bottom: 0; }
+.mat-opt:hover { color: var(--accent); padding-left: 12px; }
+.mat-opt.selected { background: rgba(200,64,42,.12); color: var(--accent); font-weight: 700; }
+
+.note-timeline {
+  max-height: 34vh; overflow-y: auto; margin-bottom: 16px;
+  padding: 4px 2px;
+}
+.note-timeline::-webkit-scrollbar { width: 4px; }
+.note-timeline::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+.note-gap {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; cursor: pointer; padding: 7px 0;
+}
+.note-gap-line { flex: 1; height: 1px; background: var(--border); transition: all .15s; }
+.note-gap-label {
+  font-size: 10px; font-family: var(--mono); color: var(--muted);
+  white-space: nowrap; opacity: 0; transition: all .15s; letter-spacing: .3px;
+}
+.note-gap:hover .note-gap-label { opacity: .6; }
+.note-gap.selected .note-gap-line { background: var(--accent); height: 2px; }
+.note-gap.selected .note-gap-label { opacity: 1; color: var(--accent); font-weight: 700; }
+.note-seg-card {
+  background: var(--dim); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; pointer-events: none;
+}
+.note-seg-card .seg-ts { display: block; font-size: 9px; color: var(--accent); font-family: var(--mono); margin-bottom: 4px; font-weight: 600; }
+.note-seg-card .seg-preview { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.75); }
+.note-seg-card.is-note .seg-ts { color: var(--gold); }
+.note-seg-card.is-note .seg-preview { color: var(--gold); font-style: italic; }
+.mat-input-row { display: flex; gap: 10px; }
+.mat-input {
+  flex: 1; background: var(--dim); border: 1px solid var(--border); outline: none;
+  color: var(--white); font-family: var(--f); font-size: 14px;
+  padding: 12px 14px; border-radius: 11px; transition: border-color .15s;
+}
+.mat-input:focus { border-color: var(--accent); }
+.mat-add-btn {
+  background: var(--accent); color: #fff; border: 0;
+  font-family: var(--f); font-size: 14px; font-weight: 700;
+  padding: 0 20px; border-radius: 11px; cursor: pointer; flex-shrink: 0;
+}
+.mat-add-btn:hover { background: var(--accent-dk); }
+
+.form-label {
+  display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px; margin-top: 16px;
+}
+.form-label:first-of-type { margin-top: 0; }
+.form-input, .form-select, .form-textarea {
+  width: 100%; background: var(--dim); color: var(--white);
+  border: 1px solid var(--border); outline: none;
+  padding: 12px 14px; font-size: 14px; font-family: var(--f);
+  border-radius: 11px; transition: border-color .15s;
+}
+.form-input:focus, .form-select:focus { border-color: var(--accent); }
+.form-textarea { resize: none; opacity: .45; cursor: default; font-family: var(--mono); font-size: 12px; }
+#noteInput { opacity: 1; cursor: text; font-family: var(--f); font-size: 14px; resize: none; }
+.pub-materia-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--dim); border: 1px solid var(--border);
+  border-radius: 11px; padding: 12px 14px; width: 100%;
+  font-size: 13px; font-family: var(--mono); color: var(--muted);
+}
+.pub-materia-badge span { color: var(--white); font-weight: 700; }
+.sheet-actions { display: flex; gap: 12px; margin-top: 20px; }
+.sheet-actions button {
+  flex: 1; height: 48px; border: 0; border-radius: 12px;
+  font-family: var(--f); font-size: 15px; font-weight: 700; cursor: pointer; transition: all .12s;
+}
+.btn-cancel { background: var(--dim); color: var(--muted); border: 1px solid var(--border) !important; }
+.btn-cancel:hover { color: var(--white); background: rgba(255,255,255,.05); }
+.btn-confirm { background: var(--accent); color: #fff; }
+.btn-confirm:hover { background: var(--accent-dk); transform: scale(.98); }
+.sheet-status { text-align: center; font-size: 12px; color: var(--muted); margin-top: 12px; font-family: var(--mono); min-height: 16px; }
+
+.toast {
+  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  z-index: 400; background: rgba(22,22,22,.95); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.12);
+  padding: 12px 22px; border-radius: 99px; font-size: 14px; font-weight: 700;
+  white-space: nowrap; animation: toastIn .18s ease both;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.toast.ok { border-color: rgba(45,201,110,.5); color: var(--green); }
+.toast.err { border-color: rgba(200,64,42,.5); color: var(--accent); }
+.toast svg { width: 16px; height: 16px; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+.nav-links { display: flex; gap: 6px; flex-shrink: 0; }
+.nav-link {
+  background: var(--dim); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 12px; font-size: 12px; font-weight: 700; font-family: var(--f);
+  color: var(--muted); cursor: pointer; transition: all .15s; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.nav-link svg { width: 14px; height: 14px; }
+.nav-link:hover { color: var(--white); border-color: var(--border-hi); background: var(--dim); }
+@media (max-width: 480px) {
+  .nav-link span { display: none; }
+  .nav-link { padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="logo-area" onclick="window.open('/social','_blank')">
+      <img class="logo-img" src="/logotriskl.png" alt="triskl" onerror="this.style.display='none'">
+      <span class="logo-text">TRISKL</span>
+    </div>
+    <div class="top-center" onclick="openMat()">
+      <div class="materia-label">
+        <span id="barTitle">Sin materia</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+    <div class="word-chip" id="wordChip">0 palabras</div>
+  </header>
+
+  <div class="scroll" id="scroll">
+    <div class="placeholder" id="placeholder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+      Seleccioná una materia y presioná <strong>Iniciar</strong> para transcribir.
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="lang-row" id="langRow">
+      <button class="lang-opt on" data-lang="es">ES</button>
+      <button class="lang-opt" data-lang="en">EN</button>
+      <button class="lang-opt" data-lang="pt">PT</button>
+      <button class="lang-opt" data-lang="auto">Auto</button>
+    </div>
+
+    <div class="act-row">
+      <button class="act-btn pub" id="btnPub">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        Publicar
+      </button>
+      <button class="act-btn" id="btnCopy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copiar
+      </button>
+      <button class="act-btn" id="btnDl">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar
+      </button>
+    </div>
+
+    <div class="act-row2">
+      <button class="act-btn" id="btnNote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Nota
+      </button>
+      <button class="act-btn boost" id="btnBoost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        Saturar
+      </button>
+    </div>
+
+    <button class="rec-btn idle" id="recBtn">
+      <span class="rec-dot"></span>
+      <span id="recLabel">Iniciar</span>
+    </button>
+    <div class="status-line" id="statusLine">Listo</div>
+  </div>
+</div>
+
+<!-- MATERIA SHEET -->
+<div class="overlay h" id="matModal">
+  <div class="sheet">
+    <div class="sheet-header">
+      <div class="sheet-title">Seleccioná materia</div>
+      <button class="sheet-close" onclick="closeMat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="mat-list" id="matList"></div>
+    <div class="mat-input-row">
+      <input class="mat-input" id="matInput" type="text" placeholder="Nueva materia…" maxlength="60"/>
+      <button class="mat-add-btn" id="matOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- PUBLISH SHEET -->
+<div class="overlay h" id="pubModal">
+  <div class="sheet">
+    <div class="sheet-header">
+      <div class="sheet-title">Publicar en el feed</div>
+      <button class="sheet-close" onclick="closePub()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <label class="form-label">Título</label>
+    <input class="form-input" id="pubTitle" type="text" placeholder="Nombre de la publicación…"/>
+    <label class="form-label" style="margin-top:14px;">Materia</label>
+    <div class="pub-materia-badge"><span id="pubMateriaDisplay">—</span></div>
+    <label class="form-label" style="margin-top:14px;">Visibilidad</label>
+    <select class="form-select" id="pubVis">
+      <option value="todos">Todos</option>
+      <option value="friends">Solo seguidos</option>
+      <option value="private">Privado</option>
+    </select>
+    <label class="form-label">Vista previa</label>
+    <textarea class="form-textarea" id="pubPreview" rows="5" readonly></textarea>
+    <div class="sheet-actions">
+      <button class="btn-cancel" onclick="closePub()">Cancelar</button>
+      <button class="btn-confirm" onclick="doPublish()">Publicar</button>
+    </div>
+    <div class="sheet-status" id="pubStatus"></div>
+  </div>
+</div>
+
+<!-- NOTE SHEET -->
+<div class="overlay h" id="noteModal">
+  <div class="sheet">
+    <div class="sheet-header">
+      <div class="sheet-title">Agregar nota</div>
+      <button class="sheet-close" onclick="closeNote()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <label class="form-label">Insertar</label>
+    <div class="note-timeline" id="notePosList"></div>
+    <label class="form-label">Nota</label>
+    <textarea class="form-input" id="noteInput" rows="4" placeholder="Escribí una nota para insertar entre segmentos…"></textarea>
+    <div class="sheet-actions">
+      <button class="btn-cancel" onclick="closeNote()">Cancelar</button>
+      <button class="btn-confirm" onclick="doAddNote()">Agregar</button>
+    </div>
+    <div class="sheet-status" id="noteStatus"></div>
+  </div>
+</div>
+
+<script>
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+const API = '/api/handler', LS = 'triskl_session', MK = 'triskl_materias';
+let SESSION = (() => { try { return JSON.parse(localStorage.getItem(LS)); } catch(_) { return null; } })();
+if (!SESSION?.id) location.href = '/';
+
+let sid = null, materia = '', recording = false, segs = [], wordCount = 0;
+let interim = null, matList = [], lang = 'es', recognition = null;
+let isStarting = false;
+let pendingResumeSessionId = null;
+let pendingResumeMateria = null;
+let boostInput = false; // "saturar entrada": fuerza autoGainControl y apaga supresión de ruido/eco al pedir el mic
+let lastInterimText = '', lastInterimChangeAt = 0, watchdogTimer = null; // vigila texto en cursiva que no se guarda
+let notePosIndex = null; // índice donde insertar la próxima nota dentro de segs
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+const loadML = () => { try { return JSON.parse(localStorage.getItem(MK)) || []; } catch(_) { return []; } };
+const saveML = l => localStorage.setItem(MK, JSON.stringify(l));
+
+function getJWT() { return SESSION?.jwt || null; }
+function getRefreshToken() { return SESSION?.refresh_token || null; }
+
+function authHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${getJWT()}`,
+    'X-Refresh-Token': getRefreshToken() || ''
+  };
+}
+
+function getHeaders() {
+  return {
+    'Authorization': `Bearer ${getJWT()}`,
+    'X-Refresh-Token': getRefreshToken() || ''
+  };
+}
+
+// ─── AUTO-REFRESH: intenta renovar el JWT silenciosamente ───────────────────
+let _refreshPromise = null; // evita múltiples refreshes simultáneos
+
+async function refreshSession() {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = _doRefresh().finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
+async function _doRefresh() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API}?action=refresh-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (data.jwt) {
+      SESSION = {
+        ...SESSION,
+        jwt: data.jwt,
+        refresh_token: data.refresh_token || SESSION.refresh_token,
+        expires_at: data.expires_at || SESSION.expires_at
+      };
+      localStorage.setItem(LS, JSON.stringify(SESSION));
+      return true;
+    }
+    return false;
+  } catch(_) { return false; }
+}
+
+function redirectToLogin(msg) {
+  toast(msg || 'Sesión expirada, reingresá', 'err', 4000);
+  setTimeout(() => { location.href = '/'; }, 3000);
+}
+
+// ─── POST con auto-retry tras refresh ───────────────────────────────────────
+async function POST(action, body) {
+  let res = await fetch(`${API}?action=${action}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+
+  // 401 → intentar refresh y reintentar una vez
+  if (res.status === 401) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      res = await fetch(`${API}?action=${action}`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+    }
+    if (res.status === 401) {
+      redirectToLogin();
+      return {};
+    }
+  }
+
+  if (!res.ok) { console.warn(`POST ${action} → ${res.status}`); return {}; }
+  return res.json().catch(() => ({}));
+}
+
+// ─── GET con auto-retry tras refresh ────────────────────────────────────────
+async function GET(action, params) {
+  const url = `${API}?action=${action}${params ? '&' + params : ''}`;
+  let res = await fetch(url, { headers: getHeaders() });
+
+  if (res.status === 401) {
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      res = await fetch(url, { headers: getHeaders() });
+    }
+    if (res.status === 401) {
+      redirectToLogin();
+      return [];
+    }
+  }
+
+  if (!res.ok) { console.warn(`GET ${action} → ${res.status}`); return []; }
+  return res.json().catch(() => []);
+}
+
+// ─── Utilidades ─────────────────────────────────────────────────────────────
+function countWords(text) {
+  return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
+let totalWordsAddedThisSession = 0;
+
+async function checkAndResumeSession() {
+  const resumeMateria = sessionStorage.getItem('triskl_materia');
+  const resumeSid     = sessionStorage.getItem('triskl_resume_sid');
+  sessionStorage.removeItem('triskl_materia');
+  sessionStorage.removeItem('triskl_resume_sid');
+  if (!resumeMateria || !resumeSid) return false;
+
+  try {
+    const sessionCheck = await GET('sessions', `id=eq.${resumeSid}&select=ended_at`);
+    if (sessionCheck && sessionCheck.length && sessionCheck[0].ended_at) {
+      toast('La sesión fue cerrada, comenzando una nueva...', 'err');
+      return false;
+    }
+  } catch(e) {
+    console.warn('Error checking session:', e);
+    return false;
+  }
+
+  pendingResumeSessionId = resumeSid;
+  pendingResumeMateria   = resumeMateria;
+  return true;
+}
+
+async function actuallyResumeSession() {
+  if (!pendingResumeSessionId || !pendingResumeMateria) return false;
+
+  materia = pendingResumeMateria;
+  sid     = pendingResumeSessionId;
+  document.getElementById('barTitle').textContent = materia;
+  const placeholder = document.getElementById('placeholder');
+  if (placeholder) placeholder.style.display = 'none';
+
+  const existingSegs = await GET('segments', `session_id=${sid}`);
+  if (existingSegs && existingSegs.length) {
+    segs = existingSegs.map(s => ({
+      ts:   new Date(s.recorded_at).toLocaleTimeString('es-UY', { hour:'2-digit', minute:'2-digit' }),
+      text: s.text
+    }));
+    wordCount = segs.reduce((acc, s) => acc + countWords(s.text), 0);
+    document.getElementById('wordChip').textContent = wordCount + ' palabras';
+
+    const scroll = document.getElementById('scroll');
+    [...scroll.children].forEach(c => { if (c !== placeholder) c.remove(); });
+    segs.forEach(s => {
+      const el = document.createElement('div'); el.className = 'seg' + (s.text.startsWith('###### NOTA ######') ? ' is-note' : '');
+      el.innerHTML = `<span class="seg-ts">${s.ts}</span><span class="seg-text">${esc(s.text)}</span>`;
+      scroll.appendChild(el);
+    });
+    scrollDown();
+    toast(`Sesión retomada: ${materia} (${wordCount} palabras previas)`);
+  } else {
+    toast(`Retomando sesión: ${materia}`);
+  }
+
+  pendingResumeSessionId = null;
+  pendingResumeMateria   = null;
+  return true;
+}
+
+// ─── Selector de idioma ──────────────────────────────────────────────────────
+document.querySelectorAll('.lang-opt').forEach(b => {
+  b.addEventListener('click', () => {
+    if (recording) return;
+    lang = b.dataset.lang;
+    document.querySelectorAll('.lang-opt').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+  });
+});
+
+// ─── Materia sheet ───────────────────────────────────────────────────────────
+function openMat() {
+  matList = loadML();
+  const list = document.getElementById('matList'); list.innerHTML = '';
+  matList.forEach(m => {
+    const btn = document.createElement('button'); btn.className = 'mat-opt'; btn.textContent = m;
+    btn.onclick = () => {
+      if (pendingResumeSessionId && pendingResumeMateria === m) {
+        actuallyResumeSession();
+      } else {
+        if (pendingResumeSessionId) {
+          pendingResumeSessionId = null; pendingResumeMateria = null;
+          toast(`Nueva sesión: ${m}`, 'ok');
+        }
+        pickMat(m);
+      }
+      closeMat();
+    };
+    list.appendChild(btn);
+  });
+  document.getElementById('matInput').value = '';
+  document.getElementById('matModal').classList.remove('h');
+  setTimeout(() => document.getElementById('matInput').focus(), 200);
+}
+function closeMat() { document.getElementById('matModal').classList.add('h'); }
+document.getElementById('matModal').addEventListener('click', e => { if (e.target === document.getElementById('matModal')) closeMat(); });
+
+function pickMat(m) {
+  if (recording) { toast('Detené la grabación antes de cambiar materia', 'err'); return; }
+  materia = m;
+  document.getElementById('barTitle').textContent = m;
+  const placeholder = document.getElementById('placeholder');
+  if (placeholder) placeholder.style.display = 'flex';
+  sid = null; segs = []; wordCount = 0; totalWordsAddedThisSession = 0;
+  document.getElementById('wordChip').textContent = '0 palabras';
+  const scroll = document.getElementById('scroll');
+  [...scroll.children].forEach(c => { if (c !== placeholder) c.remove(); });
+}
+
+function handleMatConfirm(v) {
+  if (!v) return;
+  if (!matList.includes(v)) { matList.unshift(v); saveML(matList); }
+  if (pendingResumeSessionId && pendingResumeMateria === v) {
+    actuallyResumeSession(); closeMat();
+  } else {
+    if (pendingResumeSessionId) {
+      pendingResumeSessionId = null; pendingResumeMateria = null;
+      toast(`Nueva sesión: ${v}`, 'ok');
+    }
+    pickMat(v); closeMat();
+  }
+}
+
+document.getElementById('matOk').addEventListener('click', () => {
+  handleMatConfirm(document.getElementById('matInput').value.trim());
+});
+document.getElementById('matInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleMatConfirm(document.getElementById('matInput').value.trim());
+});
+
+// ─── Publish sheet ───────────────────────────────────────────────────────────
+function openPub() {
+  if (!segs.length) { toast('Sin texto aún', 'err'); return; }
+  document.getElementById('pubTitle').value = materia;
+  document.getElementById('pubMateriaDisplay').textContent = materia || '—';
+  document.getElementById('pubPreview').value = segs.map(s => s.text).join('\n\n').slice(0, 400);
+  document.getElementById('pubStatus').textContent = '';
+  document.getElementById('pubModal').classList.remove('h');
+}
+function closePub() { document.getElementById('pubModal').classList.add('h'); }
+document.getElementById('pubModal').addEventListener('click', e => { if (e.target === document.getElementById('pubModal')) closePub(); });
+
+async function doPublish() {
+  const title = document.getElementById('pubTitle').value.trim();
+  if (!title) { document.getElementById('pubStatus').textContent = 'Ingresá un título.'; return; }
+  document.getElementById('pubStatus').textContent = 'Publicando…';
+  const content = segs.map(s => s.text).join('\n\n');
+  const d = await POST('publish', {
+    session_id: sid, title, content,
+    visibility: document.getElementById('pubVis').value,
+    username: SESSION.username, user_id: SESSION.id, materia
+  });
+  if (d.ok || d.id) {
+    document.getElementById('pubStatus').textContent = '✓ Publicado.';
+    setTimeout(closePub, 1300);
+    toast('Publicado');
+  } else {
+    document.getElementById('pubStatus').textContent = 'Error al publicar.';
+  }
+}
+
+// ─── Note sheet ──────────────────────────────────────────────────────────────
+function openNote() {
+  document.getElementById('noteInput').value = '';
+  document.getElementById('noteStatus').textContent = '';
+  notePosIndex = segs.length; // por defecto: al final
+  renderNotePosList();
+  document.getElementById('noteModal').classList.remove('h');
+  const posList = document.getElementById('notePosList');
+  requestAnimationFrame(() => { posList.scrollTop = posList.scrollHeight; });
+  setTimeout(() => document.getElementById('noteInput').focus(), 200);
+}
+function closeNote() { document.getElementById('noteModal').classList.add('h'); }
+document.getElementById('noteModal').addEventListener('click', e => { if (e.target === document.getElementById('noteModal')) closeNote(); });
+
+function renderNotePosList() {
+  const wrap = document.getElementById('notePosList');
+  wrap.innerHTML = '';
+
+  const makeGap = (idx) => {
+    const gap = document.createElement('button');
+    gap.type = 'button';
+    gap.className = 'note-gap' + (notePosIndex === idx ? ' selected' : '');
+    gap.innerHTML = `<span class="note-gap-line"></span><span class="note-gap-label">+ insertar aquí</span><span class="note-gap-line"></span>`;
+    gap.onclick = () => { notePosIndex = idx; renderNotePosList(); };
+    return gap;
+  };
+
+  wrap.appendChild(makeGap(0));
+  segs.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'note-seg-card' + (s.text.startsWith('###### NOTA ######') ? ' is-note' : '');
+    const preview = s.text.replace(/\n/g, ' ').slice(0, 60);
+    card.innerHTML = `<span class="seg-ts">${s.ts}</span><span class="seg-preview">${esc(preview)}${s.text.length > 60 ? '…' : ''}</span>`;
+    wrap.appendChild(card);
+    wrap.appendChild(makeGap(i + 1));
+  });
+}
+
+async function doAddNote() {
+  const txt = document.getElementById('noteInput').value.trim();
+  if (!txt) { document.getElementById('noteStatus').textContent = 'Escribí algo primero.'; return; }
+  if (!materia) { closeNote(); openMat(); return; }
+  if (!sid) await createNewSession();
+  insertNoteAt(notePosIndex, `###### NOTA ######\n${txt}`);
+  closeNote();
+  toast('Nota agregada');
+}
+document.getElementById('btnNote').addEventListener('click', openNote);
+
+function insertNoteAt(index, text) {
+  const now   = new Date().toLocaleTimeString('es-UY', { hour:'2-digit', minute:'2-digit' });
+  const words = countWords(text);
+  segs.splice(index, 0, { ts: now, text });
+  wordCount += words;
+  totalWordsAddedThisSession += words;
+  document.getElementById('wordChip').textContent = wordCount + ' palabras';
+  renderAllSegments();
+
+  // Nota: el orden persistido en el servidor sigue el momento de guardado
+  // (push-segment), así que si se retoma la sesión más adelante puede no
+  // respetar exactamente esta posición intermedia.
+  POST('push-segment', {
+    segment_id: crypto.randomUUID(),
+    session_id: sid,
+    materia: materia || 'Sin materia',
+    text,
+    username: SESSION?.username || null
+  }).catch(() => {});
+}
+
+function renderAllSegments() {
+  const scroll = document.getElementById('scroll');
+  const placeholder = document.getElementById('placeholder');
+  [...scroll.children].forEach(c => { if (c !== placeholder && c !== interim) c.remove(); });
+  if (placeholder) placeholder.style.display = segs.length ? 'none' : 'flex';
+  segs.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'seg' + (s.text.startsWith('###### NOTA ######') ? ' is-note' : '');
+    el.innerHTML = `<span class="seg-ts">${s.ts}</span><span class="seg-text">${esc(s.text)}</span>`;
+    scroll.appendChild(el);
+  });
+  if (interim) scroll.appendChild(interim);
+  scrollDown();
+}
+
+// ─── Saturar entrada (boost de mic) ──────────────────────────────────────────
+document.getElementById('btnBoost').addEventListener('click', () => {
+  boostInput = !boostInput;
+  document.getElementById('btnBoost').classList.toggle('on', boostInput);
+  toast(boostInput
+    ? 'Saturación activada: se fuerza auto-ganancia al iniciar el mic'
+    : 'Saturación desactivada', boostInput ? 'ok' : 'ok');
+});
+
+async function primeBoostedMic() {
+  if (!boostInput || !navigator.mediaDevices?.getUserMedia) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { autoGainControl: true, noiseSuppression: false, echoCancellation: false }
+    });
+    stream.getTracks().forEach(t => t.stop());
+  } catch(_) { /* si falla, seguimos con el comportamiento normal del navegador */ }
+}
+
+// ─── Sesión de transcripción ─────────────────────────────────────────────────
+async function createNewSession() {
+  const id = crypto.randomUUID();
+  await POST('new-session', {
+    session_id: id,
+    materia: materia || 'Sin materia',
+    username: SESSION?.username || null,
+    langs: [lang === 'auto' ? 'es' : lang],
+    file_path: ''
+  });
+  sid = id;
+  return id;
+}
+
+function getLangCode() {
+  if (lang === 'en')   return 'en-US';
+  if (lang === 'pt')   return 'pt-BR';
+  if (lang === 'auto') return undefined;
+  return 'es-ES';
+}
+
+function commit(text) {
+  if (!text || text.trim() === '') return;
+  const now      = new Date().toLocaleTimeString('es-UY', { hour:'2-digit', minute:'2-digit' });
+  const cleaned  = text.trim();
+  const isNote   = cleaned.startsWith('###### NOTA ######');
+  const newWords = countWords(cleaned);
+  wordCount     += newWords;
+  totalWordsAddedThisSession += newWords;
+  segs.push({ ts: now, text: cleaned });
+
+  if (interim) { interim.remove(); interim = null; }
+
+  const el = document.createElement('div'); el.className = 'seg' + (isNote ? ' is-note' : '');
+  el.innerHTML = `<span class="seg-ts">${now}</span><span class="seg-text">${esc(cleaned)}</span>`;
+  const placeholder = document.getElementById('placeholder');
+  if (placeholder) placeholder.style.display = 'none';
+  document.getElementById('scroll').appendChild(el);
+  scrollDown();
+  document.getElementById('wordChip').textContent = wordCount + ' palabras';
+
+  // El servidor ya actualiza XP y total_words en push-segment; no duplicar en cliente
+  POST('push-segment', {
+    segment_id: crypto.randomUUID(),
+    session_id: sid,
+    materia: materia || 'Sin materia',
+    text: cleaned,
+    username: SESSION?.username || null
+  }).catch(() => {});
+}
+
+function showInterim(t) {
+  if (!t || !recording) {
+    if (interim) { interim.remove(); interim = null; }
+    lastInterimText = '';
+    return;
+  }
+  if (t !== lastInterimText) {
+    lastInterimText = t;
+    lastInterimChangeAt = Date.now();
+  }
+  if (!interim) {
+    interim = document.createElement('div');
+    interim.className = 'seg-interim';
+    document.getElementById('scroll').appendChild(interim);
+  }
+  interim.textContent = t;
+  scrollDown();
+}
+
+// ─── Watchdog: si el interim queda 3s sin cambiar, se guarda y se relanza ────
+function startWatchdog() {
+  stopWatchdog();
+  watchdogTimer = setInterval(() => {
+    if (!recording || !lastInterimText) return;
+    if (Date.now() - lastInterimChangeAt >= 3000) {
+      const stuck = lastInterimText;
+      lastInterimText = '';
+      lastInterimChangeAt = 0;
+      if (interim) { interim.remove(); interim = null; }
+      commit(stuck);
+      try { recognition && recognition.stop(); } catch(_) {}
+    }
+  }, 500);
+}
+function stopWatchdog() {
+  if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null; }
+}
+
+function scrollDown() {
+  const s = document.getElementById('scroll');
+  s.scrollTop = s.scrollHeight;
+}
+
+// ─── SpeechRecognition ───────────────────────────────────────────────────────
+function initRecognition() {
+  if (!SR) return null;
+  const r = new SR();
+  r.continuous      = true;
+  r.interimResults  = true;
+  const lc = getLangCode();
+  if (lc) r.lang = lc;
+
+  r.onresult = (e) => {
+    if (!recording) return;
+    let finalText = '', interimText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const result     = e.results[i];
+      const transcript = result[0].transcript;
+      if (result.isFinal) { if (transcript && transcript.trim()) finalText += transcript + ' '; }
+      else interimText += transcript;
+    }
+    if (finalText.trim()) commit(finalText.trim());
+    showInterim(interimText);
+  };
+
+  r.onerror = (e) => {
+    console.warn('SpeechRecognition error:', e.error);
+    if (e.error === 'not-allowed') { toast('Permiso de micrófono denegado', 'err'); stop(); return; }
+    if (recording) {
+      setStatus('Error: ' + e.error, 'err');
+      setTimeout(() => {
+        if (recording && recognition) {
+          try { recognition.stop(); setTimeout(() => { if (recording && recognition) recognition.start(); }, 100); } catch(_) {}
+        }
+      }, 1000);
+    }
+  };
+
+  r.onend = () => {
+    if (recording && !isStarting) {
+      setTimeout(() => { if (recording && recognition) { try { recognition.start(); } catch(_) {} } }, 100);
+    }
+  };
+
+  return r;
+}
+
+document.getElementById('recBtn').addEventListener('click', async () => {
+  if (recording) await stop(); else await start();
+});
+
+async function start() {
+  if (isStarting || recording) return;
+  if (!materia) { openMat(); return; }
+  if (!SR) { toast('Usá Chrome/Edge/Safari para grabar', 'err'); return; }
+
+  isStarting = true;
+  setStatus('Iniciando...');
+
+  try {
+    if (!sid) await createNewSession();
+    await primeBoostedMic();
+
+    if (recognition) { try { recognition.stop(); } catch(_) {} recognition = null; }
+    recognition = initRecognition();
+    if (!recognition) { toast('No se pudo iniciar el reconocimiento', 'err'); isStarting = false; return; }
+
+    recording = true;
+    recognition.start();
+
+    document.getElementById('recBtn').className  = 'rec-btn rec';
+    document.getElementById('recLabel').textContent = 'Detener';
+    setStatus(boostInput ? 'Escuchando… (saturación activa)' : 'Escuchando…', 'on');
+    startWatchdog();
+  } catch(e) {
+    console.error(e);
+    toast('Error al iniciar: ' + e.message, 'err');
+  } finally {
+    isStarting = false;
+  }
+}
+
+async function stop() {
+  if (!recording) return;
+  recording = false; isStarting = false;
+  stopWatchdog();
+  if (recognition) {
+    try { recognition.onend = null; recognition.stop(); } catch(_) {}
+    recognition = null;
+  }
+  if (interim) { interim.remove(); interim = null; }
+  lastInterimText = ''; lastInterimChangeAt = 0;
+  document.getElementById('recBtn').className     = 'rec-btn idle';
+  document.getElementById('recLabel').textContent = 'Iniciar';
+  setStatus('Listo');
+  if (sid) await POST('close-session', { session_id: sid }).catch(() => {});
+  if (totalWordsAddedThisSession > 0) toast(`Sesión finalizada. +${totalWordsAddedThisSession} palabras`);
+  totalWordsAddedThisSession = 0;
+}
+
+function setStatus(t, c = '') {
+  const el = document.getElementById('statusLine');
+  el.textContent  = t;
+  el.className    = 'status-line' + (c ? ' ' + c : '');
+}
+
+// ─── Copiar / Descargar ──────────────────────────────────────────────────────
+document.getElementById('btnCopy').addEventListener('click', async () => {
+  if (!segs.length) { toast('Sin texto aún', 'err'); return; }
+  try {
+    await navigator.clipboard.writeText(segs.map(s => s.text).join('\n\n'));
+    toast('Copiado');
+  } catch(_) { toast('Error al copiar', 'err'); }
+});
+
+document.getElementById('btnDl').addEventListener('click', () => {
+  if (!segs.length) { toast('Sin texto aún', 'err'); return; }
+  const b   = segs.map(s => `[${s.ts}] ${s.text}`).join('\n\n');
+  const hdr = `Materia: ${materia}\nFecha: ${new Date().toLocaleString('es-UY')}\nUsuario: @${SESSION.username||''}\n${'─'.repeat(40)}\n\n`;
+  const a   = document.createElement('a');
+  a.href     = 'data:text/plain;charset=utf-8,' + encodeURIComponent(hdr + b);
+  a.download = `${materia.replace(/\s+/g,'_')}_transcripcion.txt`;
+  a.click(); toast('Descargando…');
+});
+
+document.getElementById('btnPub').addEventListener('click', openPub);
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toast(msg, type = 'ok', ms = 2200) {
+  const el = document.createElement('div'); el.className = `toast ${type}`;
+  el.innerHTML = type === 'ok'
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg><span>${msg}</span>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg><span>${msg}</span>`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+(async () => {
+  matList = loadML();
+  try {
+    const r  = await GET('sessions', `username=${SESSION.username}`);
+    const cm = [...new Set((r||[]).map(s => s.materia).filter(Boolean))];
+    cm.forEach(m => { if (!matList.includes(m)) matList.push(m); });
+    matList = [...new Set(matList)].sort(); saveML(matList);
+  } catch(_) {}
+
+  const hasPending = await checkAndResumeSession();
+  if (!hasPending) {
+    const pre = sessionStorage.getItem('triskl_materia');
+    if (pre) { pickMat(pre); sessionStorage.removeItem('triskl_materia'); }
+    else openMat();
+  } else {
+    openMat();
+  }
+})();
+</script>
+</body>
+</html>
