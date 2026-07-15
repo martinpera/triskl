@@ -179,6 +179,17 @@ async function ensureUserProfile(uid, email, username, jwt, gen = null) {
   }
 }
 
+// Devuelve { id, gen } del dueño del JWT, o null.
+async function getViewer(jwt, auto) {
+  if (!jwt) return null;
+  const u = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { "apikey": SUPABASE_ANON, "Authorization": `Bearer ${jwt}` }
+  }).then(r => r.json()).catch(() => ({}));
+  if (!u || !u.id) return null;
+  const row = await auto(j => sbGet("triskl_users", `id=eq.${u.id}&select=gen`, j)).catch(() => []);
+  return { id: u.id, gen: (row && row[0]?.gen) ?? null };
+}
+
 // ─── Handler principal ───────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -387,17 +398,17 @@ export default async function handler(req, res) {
     }
 
     if (action === "save-push-subscription") {
-      const { user_id, endpoint, p256dh, auth, device_name } = req.body;
+      const { user_id, endpoint, p256dh, auth: authKey, device_name } = req.body;
       if (!user_id || !endpoint) return res.status(400).json({ error: "user_id y endpoint requeridos" });
       const existing = await sbAdminGet("push_subscriptions", `endpoint=eq.${encodeURIComponent(endpoint)}`).catch(() => []);
       if (existing?.length) {
         await fetch(`${SUPABASE_URL}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}`, {
           method: "PATCH", headers: serviceHeaders(),
-          body: JSON.stringify({ user_id, p256dh, auth, device_name: device_name || "Dispositivo", updated_at: new Date().toISOString() })
+          body: JSON.stringify({ user_id, p256dh, auth: authKey, device_name: device_name || "Dispositivo", updated_at: new Date().toISOString() })
         });
       } else {
         await sbAdminPost("push_subscriptions", {
-          user_id, endpoint, p256dh, auth,
+          user_id, endpoint, p256dh, auth: authKey,
           device_name: device_name || "Dispositivo",
           created_at: new Date().toISOString(), updated_at: new Date().toISOString()
         });
@@ -431,6 +442,70 @@ export default async function handler(req, res) {
         { method: "DELETE", headers: serviceHeaders() }
       );
       return res.status(200).json({ ok: true });
+    }
+
+    // ========== FEED PAGINADO (cursor por created_at) ==========
+    if (action === "feed") {
+      const scope  = req.query.scope || "gen";                 // gen | friends | mine
+      const limit  = Math.min(parseInt(req.query.limit || "12", 10) || 12, 30);
+      const before = req.query.before || null;
+
+      const viewer = await getViewer(jwt, auto);
+      if (!viewer) return res.status(401).json({ error: "No autenticado" });
+      const viewerKey = viewer.gen === null ? 2009 : viewer.gen;
+
+      const COLS = [
+        "id", "user_id", "username", "title", "materia", "content", "visibility",
+        "post_type", "created_at", "comments_count", "poll_options", "poll_votes",
+        "poll_voters", "attached_transcript", "media",
+        "user:user_id(id,username,avatar_url,xp,level,gen)"
+      ].join(",");
+
+      let filter;
+      if (scope === "mine") {
+        filter = `user_id=eq.${viewer.id}&visibility=eq.private`;
+      } else if (scope === "friends") {
+        const [fo, fr] = await Promise.all([
+          auto(j => sbGet("follows", `follower_id=eq.${viewer.id}&select=followed_id`, j)).catch(() => []),
+          auto(j => sbGet("follows", `followed_id=eq.${viewer.id}&select=follower_id`,  j)).catch(() => []),
+        ]);
+        const following = new Set((fo || []).map(r => r.followed_id).filter(Boolean));
+        const friends   = (fr || []).map(r => r.follower_id).filter(id => id && following.has(id));
+        const ids = [...new Set([...friends, viewer.id])];
+        filter = `user_id=in.(${ids.join(",")})&or=(visibility.eq.todos,visibility.eq.friends)`;
+      } else {
+        filter = `visibility=eq.todos`;
+      }
+
+      const RAW   = limit + 10;
+      const items = [];
+      let cursor  = before;
+      let hasMore = true;
+
+      for (let i = 0; i < 5 && items.length < limit && hasMore; i++) {
+        let params = `${filter}&order=created_at.desc&limit=${RAW}&select=${COLS}`;
+        if (cursor) params += `&created_at=lt.${encodeURIComponent(cursor)}`;
+
+        const rows = await auto(j => sbGet("publications", params, j));
+        if (!rows || !rows.length) { hasMore = false; break; }
+        if (rows.length < RAW) hasMore = false;
+        cursor = rows[rows.length - 1].created_at;
+
+        for (const p of rows) {
+          if (scope === "gen" && p.user_id !== viewer.id) {
+            const authorKey = (p.user?.gen ?? null) === null ? 2009 : p.user.gen;
+            if (authorKey !== viewerKey) continue;
+          }
+          items.push(p);
+          if (items.length >= limit) break;
+        }
+      }
+
+      return res.status(200).json({
+        items,
+        next_cursor: items.length ? items[items.length - 1].created_at : cursor,
+        has_more: hasMore && items.length >= limit,
+      });
     }
 
     // ========== PUBLICACIONES ==========
@@ -660,7 +735,6 @@ export default async function handler(req, res) {
 
       await auto(j => sbPost("direct_messages", payload, j));
 
-      // ── Notificación con contenido real del mensaje ──
       const notifBody = content.startsWith('📎')
         ? `@${sender_uname} te envió un archivo`
         : `@${sender_uname}: ${content.slice(0, 100)}`;
@@ -793,6 +867,19 @@ export default async function handler(req, res) {
       if (reply_to)            payload.reply_to            = reply_to;
 
       await auto(j => sbPost("group_messages", payload, j));
+
+      // Notificación a cada miembro del grupo (menos el que manda).
+      const mems = await auto(j => sbGet("group_members", `group_id=eq.${group_id}&select=user_id`, j)).catch(() => []);
+      for (const m of (mems || [])) {
+        if (m.user_id === sender_id) continue;
+        await auto(j => sbPost("notifications", {
+          user_id: m.user_id, from_uid: sender_id, from_uname: sender_uname,
+          type: "group_message", group_id,
+          content: `@${sender_uname}: ${String(content).slice(0, 100)}`,
+          read: false, created_at: new Date().toISOString()
+        }, j)).catch(() => null);
+      }
+
       return res.status(200).json({ ok: true });
     }
 
@@ -854,10 +941,7 @@ export default async function handler(req, res) {
     if (action === "mark-all-notifs-read") {
       const { user_id } = req.body;
       if (!user_id) return res.status(400).json({ error: "user_id requerido" });
-      const rows = await auto(j => sbGet("notifications", `user_id=eq.${user_id}&read=eq.false&select=id`, j)).catch(() => []);
-      for (const n of (rows || [])) {
-        await auto(j => sbPatch("notifications", `id=eq.${n.id}`, { read: true }, j)).catch(() => null);
-      }
+      await auto(j => sbPatch("notifications", `user_id=eq.${user_id}&read=eq.false`, { read: true }, j)).catch(() => null);
       return res.status(200).json({ ok: true });
     }
 
@@ -1116,6 +1200,7 @@ export default async function handler(req, res) {
     if (action === "delete-session") {
       const { session_id } = req.body;
       if (!session_id) return res.status(400).json({ error: "session_id requerido" });
+      await auto(j => sbDelete("segments", `session_id=eq.${session_id}`, j)).catch(() => null);
       await auto(j => sbDelete("sessions", `id=eq.${session_id}`, j));
       return res.status(200).json({ ok: true });
     }
