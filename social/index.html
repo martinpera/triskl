@@ -883,18 +883,6 @@ let chatPendingMedia=[];
 let eventSource=null;
 let swRegistration = null;
 
-// ─── FEED EN BATCHES ────────────────────────────────────────────────────────────
-const FEED_BATCH = 15;
-let feedState = {
-  cursor: null,
-  hasMore: true,
-  loading: false,
-  tab: null,
-  friendIds: [],
-  friendCursor: null
-};
-let feedObserver = null;
-
 // ==================== FUNCIONES AUXILIARES ====================
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmtDate=iso=>iso?new Date(iso).toLocaleString('es-UY',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
@@ -1014,6 +1002,7 @@ async function subscribeToPush() {
 
 async function unsubscribeFromPush() {
   try {
+    // 1. Obtener endpoint actual del navegador
     let endpoint = null;
     if (swRegistration) {
       const subscription = await swRegistration.pushManager.getSubscription();
@@ -1022,12 +1011,16 @@ async function unsubscribeFromPush() {
         await subscription.unsubscribe();
       }
     }
+
+    // 2. Si tenemos endpoint, borrarlo de la tabla
     if (endpoint) {
       await apiPost('remove-push-subscription', {
         user_id: SESSION.id,
         endpoint: endpoint
       });
     } else {
+      // Fallback: borrar todos los registros de este usuario en la tabla
+      // (por si el SW no tiene suscripción pero la tabla sí tiene datos)
       const devicesRes = await fetch(`${API}?action=push-devices&user_id=${SESSION.id}`, {
         headers: { Authorization: `Bearer ${SESSION?.jwt||''}` }
       });
@@ -1036,6 +1029,7 @@ async function unsubscribeFromPush() {
         await apiPost('push-delete-device', { sub_id: dev.id, user_id: SESSION.id });
       }
     }
+
     toast('Notificaciones desactivadas', 'ok');
     updateNotifStatusInProfile(false);
     return true;
@@ -1176,182 +1170,75 @@ document.getElementById('fabNewDM').addEventListener('click',()=>{closeFab();ope
 
 document.querySelectorAll('.feed-tab').forEach(btn=>btn.addEventListener('click',()=>{feedTab=btn.dataset.ftab;document.querySelectorAll('.feed-tab').forEach(t=>t.classList.toggle('active',t.dataset.ftab===feedTab));loadFeed();}));
 
-// ========== FEED (BATCHES) ==========
-function resetFeedState() {
-  feedState = { cursor: null, hasMore: true, loading: false, tab: feedTab, friendIds: [], friendCursor: null };
-}
+// ========== FEED ==========
+async function loadFeed(highlightPostId=null){
+  const scroll=document.getElementById('feedScroll');
+  scroll.innerHTML='<div class="empty-state"><div class="empty-title">Cargando…</div></div>';
 
-// ─── Carga inicial (o recarga tras publicar/borrar) ──────────────────────────
-async function loadFeed(highlightPostId = null) {
-  const scroll = document.getElementById('feedScroll');
-  resetFeedState();
-  scroll.innerHTML = '<div class="empty-state"><div class="empty-title">Cargando…</div></div>';
-
-  await maybeShowNotifBanner(scroll);
-
-  const first = await fetchFeedBatch();
-  scroll.innerHTML = '';
-
-  if (!first.length) {
-    scroll.innerHTML = `<div class="empty-state"><div class="empty-title">${
-      feedTab === 'friends' ? 'Sin amigos aún' : 'Sin publicaciones'
-    }</div></div>`;
-    return;
-  }
-
-  appendPosts(scroll, first, highlightPostId);
-  mountSentinel(scroll);
-}
-
-// ─── Pide un batch al handler ────────────────────────────────────────────────
-async function fetchFeedBatch() {
-  if (feedState.loading || !feedState.hasMore) return [];
-  feedState.loading = true;
-
-  try {
-    let rows = [];
-
-    if (feedTab === 'all' || feedTab === 'gen') {
-      const p = new URLSearchParams({
-        action: 'publications',
-        visibility: 'todos',
-        limit: String(FEED_BATCH)
-      });
-      if (feedState.cursor) p.set('cursor', feedState.cursor);
-      const d = await apiGet(`${API}?${p}`);
-      rows = d.items || [];
-      feedState.cursor = d.next_cursor;
-      feedState.hasMore = !!d.has_more && !!d.next_cursor;
-
-    } else if (feedTab === 'mine') {
-      const p = new URLSearchParams({
-        action: 'publications',
-        user_id: SESSION.id,
-        visibility: 'private',
-        limit: String(FEED_BATCH)
-      });
-      if (feedState.cursor) p.set('cursor', feedState.cursor);
-      const d = await apiGet(`${API}?${p}`);
-      rows = d.items || [];
-      feedState.cursor = d.next_cursor;
-      feedState.hasMore = !!d.has_more && !!d.next_cursor;
-
-    } else if (feedTab === 'friends') {
-      if (!feedState.friendIds.length) {
-        feedState.friendIds = [...[...follows].filter(uid => myFollowers.has(uid)), SESSION.id];
-      }
-      if (feedState.friendIds.length <= 1 && !feedState.cursor) {
-        feedState.hasMore = false;
-        return [];
-      }
-      const results = await Promise.all(feedState.friendIds.map(uid => {
-        const p = new URLSearchParams({
-          action: 'publications',
-          user_id: uid,
-          limit: String(FEED_BATCH)
+  const notifBanner = document.getElementById('feedNotifBanner');
+  if (!notifBanner && !sessionStorage.getItem('triskl_notif_banner_dismissed')) {
+    try {
+      const subCheck = await fetch(`${API}?action=check-push-subscription&user_id=${SESSION.id}`);
+      const subData = await subCheck.json();
+      if (!subData.has_subscription && Notification.permission !== 'denied') {
+        const banner = document.createElement('div');
+        banner.id = 'feedNotifBanner';
+        banner.style.cssText = 'margin:0 14px 10px;background:rgba(200,64,42,.08);border:1px solid rgba(200,64,42,.25);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;';
+        banner.innerHTML = `
+          <div style="font-size:20px;flex-shrink:0;">🔔</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:var(--white);margin-bottom:2px;">Notificaciones desactivadas</div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.4;">Activá las notificaciones y mantenete al tanto de lo que pasa.</div>
+          </div>
+          <button id="feedNotifActivar" class="btn btn-primary btn-sm" style="flex-shrink:0;">Activar</button>
+          <button id="feedNotifCerrar" style="background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px;flex-shrink:0;">✕</button>
+        `;
+        scroll.parentElement.insertBefore(banner, scroll);
+        document.getElementById('feedNotifActivar').addEventListener('click', async () => {
+          const ok = await subscribeToPush();
+          if (ok) banner.remove();
         });
-        if (feedState.cursor) p.set('cursor', feedState.cursor);
-        return apiGet(`${API}?${p}`);
-      }));
-      const merged = results
-        .flatMap(d => d.items || [])
-        .filter(p => p.visibility === 'todos' || p.visibility === 'friends')
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-      rows = merged.slice(0, FEED_BATCH);
-      feedState.hasMore = merged.length > FEED_BATCH || results.some(d => d.has_more);
-      const last = rows[rows.length - 1];
-      feedState.cursor = last ? btoa(JSON.stringify({ t: last.created_at, i: last.id })).replace(/=+$/, '') : null;
-      if (!feedState.cursor) feedState.hasMore = false;
-    }
-
-    return rows;
-  } catch (e) {
-    console.error('[feed]', e);
-    feedState.hasMore = false;
-    return [];
-  } finally {
-    feedState.loading = false;
+        document.getElementById('feedNotifCerrar').addEventListener('click', () => {
+          banner.remove();
+          sessionStorage.setItem('triskl_notif_banner_dismissed', '1');
+        });
+      }
+    } catch(e) {}
   }
+
+  const viewerGen=SESSION.gen??null;
+  let rows=[];
+  try{
+    if(feedTab==='all'||feedTab==='gen')
+      rows=await apiGet(`${API}?action=publications&visibility=todos&order=created_at.desc`);
+    else if(feedTab==='friends'){
+      const friendIds=[...follows].filter(uid=>myFollowers.has(uid));
+      if(!friendIds.length){scroll.innerHTML='<div class="empty-state"><div class="empty-title">Sin amigos aún</div></div>';return;}
+      const allFriendIds=[...friendIds, SESSION.id];
+      const results=await Promise.all(allFriendIds.map(uid=>apiGet(`${API}?action=publications&user_id=${uid}&order=created_at.desc`)));
+      rows=results.flat().filter(p=>p.visibility==='todos'||p.visibility==='friends');
+      rows.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    }else if(feedTab==='mine')
+      rows=await apiGet(`${API}?action=publications&user_id=${SESSION.id}&visibility=private&order=created_at.desc`);
+  }catch(e){console.error(e);}
+  if(!Array.isArray(rows))rows=[];
+  if(feedTab==='all'||feedTab==='gen'){
+    const viewerKey=viewerGen===null?2009:viewerGen;
+    rows=rows.filter(p=>{if(p.user_id===SESSION.id)return true;const aGen=p.user?.gen;const aKey=aGen===null?2009:aGen;return aKey===viewerKey;});
+  }
+  renderFeed(rows,scroll,highlightPostId);
 }
 
-// ─── Render incremental ──────────────────────────────────────────────────────
-function appendPosts(container, posts, highlightId = null) {
-  posts.forEach(p => {
-    const card = buildPostCard(p);
-    if (!card || card.nodeType !== Node.ELEMENT_NODE) return;
-    if (highlightId && p.id == highlightId) {
+function renderFeed(posts,container,highlightId=null){
+  container.innerHTML='';
+  if(!posts.length){container.innerHTML='<div class="empty-state"><div class="empty-title">Sin publicaciones</div></div>';return;}
+  posts.forEach(p=>{const card=buildPostCard(p);if(card&&card.nodeType===Node.ELEMENT_NODE){
+    if(highlightId && p.id==highlightId){
       card.classList.add('highlight');
-      setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      setTimeout(()=>card.scrollIntoView({behavior:'smooth',block:'center'}),100);
     }
     container.appendChild(card);
-  });
-}
-
-// ─── Sentinela + IntersectionObserver ────────────────────────────────────────
-function mountSentinel(scroll) {
-  if (feedObserver) { feedObserver.disconnect(); feedObserver = null; }
-  document.getElementById('feedSentinel')?.remove();
-
-  if (!feedState.hasMore) return;
-
-  const sentinel = document.createElement('div');
-  sentinel.id = 'feedSentinel';
-  sentinel.style.cssText = 'padding:24px 0;text-align:center;font-size:11px;color:var(--muted);font-family:var(--mono);';
-  sentinel.textContent = 'Cargando más…';
-  scroll.appendChild(sentinel);
-
-  feedObserver = new IntersectionObserver(async entries => {
-    if (!entries[0].isIntersecting || feedState.loading || !feedState.hasMore) return;
-    const tabAtStart = feedTab;
-    const more = await fetchFeedBatch();
-    if (tabAtStart !== feedTab) return;
-
-    sentinel.remove();
-    appendPosts(scroll, more);
-
-    if (feedState.hasMore) scroll.appendChild(sentinel);
-    else {
-      const end = document.createElement('div');
-      end.style.cssText = 'padding:24px 0 40px;text-align:center;font-size:11px;color:var(--muted);font-family:var(--mono);';
-      end.textContent = '— fin del feed —';
-      scroll.appendChild(end);
-      feedObserver.disconnect();
-    }
-  }, { root: scroll, rootMargin: '400px' });
-
-  feedObserver.observe(sentinel);
-}
-
-// ─── Banner de notificaciones ────────────────────────────────────────────────
-async function maybeShowNotifBanner(scroll) {
-  if (document.getElementById('feedNotifBanner')) return;
-  if (sessionStorage.getItem('triskl_notif_banner_dismissed')) return;
-  try {
-    const subData = await fetch(`${API}?action=check-push-subscription&user_id=${SESSION.id}`).then(r => r.json());
-    if (subData.has_subscription || Notification.permission === 'denied') return;
-
-    const banner = document.createElement('div');
-    banner.id = 'feedNotifBanner';
-    banner.style.cssText = 'margin:0 14px 10px;background:rgba(200,64,42,.08);border:1px solid rgba(200,64,42,.25);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;';
-    banner.innerHTML = `
-      <div style="font-size:20px;flex-shrink:0;">🔔</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;color:var(--white);margin-bottom:2px;">Notificaciones desactivadas</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.4;">Activá las notificaciones y mantenete al tanto.</div>
-      </div>
-      <button id="feedNotifActivar" class="btn btn-primary btn-sm" style="flex-shrink:0;">Activar</button>
-      <button id="feedNotifCerrar" style="background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:0 4px;flex-shrink:0;">✕</button>`;
-    scroll.parentElement.insertBefore(banner, scroll);
-
-    document.getElementById('feedNotifActivar').addEventListener('click', async () => {
-      if (await subscribeToPush()) banner.remove();
-    });
-    document.getElementById('feedNotifCerrar').addEventListener('click', () => {
-      banner.remove();
-      sessionStorage.setItem('triskl_notif_banner_dismissed', '1');
-    });
-  } catch (e) {}
+  }});
 }
 
 function renderCmtList(cmtList, rows, pubId, cardDiv, p) {
@@ -2266,8 +2153,8 @@ async function loadSharedPostIfAny(){
   const urlParams=new URLSearchParams(window.location.search);
   const pubId=urlParams.get('pub');
   if(pubId){
-    const d=await apiGet(`${API}?action=publications&id=${pubId}`);
-    if(d.items?.length){
+    const post=await apiGet(`${API}?action=publications&id=eq.${pubId}`);
+    if(Array.isArray(post)&&post.length){
       showPage('feed');
       setTimeout(()=>loadFeed(parseInt(pubId)),500);
     }
