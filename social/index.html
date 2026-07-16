@@ -1105,8 +1105,9 @@ document.querySelectorAll('.feed-tab').forEach(btn=>btn.addEventListener('click'
 }));
 
 // ========== FEED (paginado por batches) ==========
-const FEED_PAGE=12;
-let _feed={cursor:null,loading:false,done:false,token:0,io:null};
+const FEED_PAGE=20;      // primer batch
+const FEED_NEXT=15;      // batches siguientes
+let _feed={cursor:null,loading:false,done:false,token:0,io:null,pages:0};
 
 function feedSkeleton(n=3){
   const wrap=document.createElement('div'); wrap.id='feedSkel';
@@ -1127,7 +1128,7 @@ function feedSkeleton(n=3){
 async function loadFeed(highlightPostId=null){
   const scroll=document.getElementById('feedScroll');
   const token=++_feed.token;
-  _feed.cursor=null; _feed.done=false; _feed.loading=false;
+  _feed.cursor=null; _feed.done=false; _feed.loading=false; _feed.pages=0;
   _feed.io?.disconnect(); _feed.io=null;
   scroll.innerHTML=''; scroll.appendChild(feedSkeleton());
   scroll.scrollTop=0;
@@ -1141,7 +1142,7 @@ async function loadMoreFeed(token=_feed.token, highlightId=null){
   const scroll=document.getElementById('feedScroll');
   const first=!_feed.cursor;
   const scope = feedTab==='mine' ? 'mine' : feedTab==='friends' ? 'friends' : 'gen';
-  let url=`${API}?action=feed&scope=${scope}&limit=${FEED_PAGE}`;
+  let url=`${API}?action=feed&media=0&scope=${scope}&limit=${first?FEED_PAGE:FEED_NEXT}`;
   if(_feed.cursor) url+=`&before=${encodeURIComponent(_feed.cursor)}`;
 
   let data={};
@@ -1173,15 +1174,50 @@ async function loadMoreFeed(token=_feed.token, highlightId=null){
     }
     scroll.appendChild(card);
   });
+  _feed.pages++;
+
+  // El texto ya está pintado; las fotos entran solas cuando llegan.
+  fetchBatchMedia(items.map(p=>p.id), token);
 
   if(!_feed.done){
     const s=document.createElement('div'); s.id='feedSentinel'; s.textContent='Cargando más…';
     scroll.appendChild(s);
     _feed.io?.disconnect();
-    _feed.io=new IntersectionObserver(es=>{ if(es[0].isIntersecting) loadMoreFeed(token); },{root:scroll,rootMargin:'700px'});
+    _feed.io=new IntersectionObserver(es=>{ if(es[0].isIntersecting) loadMoreFeed(token); },{root:scroll,rootMargin:'1200px'});
     _feed.io.observe(s);
   }
   _feed.loading=false;
+
+  // Adelantamos el segundo batch sin esperar a que scrollee.
+  if(_feed.pages===1 && !_feed.done) loadMoreFeed(token);
+}
+
+async function fetchBatchMedia(ids, token){
+  if(!ids || !ids.length) return;
+  const rows=await apiGet(`${API}?action=feed-media&ids=${ids.join(',')}`);
+  if(token!==_feed.token || !Array.isArray(rows)) return;
+  rows.forEach(r=>{
+    const card=document.querySelector(`.post-card[data-pub-id="${r.id}"]`);
+    if(card) renderPostMedia(card, r.media);
+  });
+}
+
+function renderPostMedia(card, mediaStr){
+  if(!card || !mediaStr || card.querySelector('.post-media')) return;
+  let arr=[]; try{ arr=JSON.parse(mediaStr); }catch(_){ return; }
+  if(!Array.isArray(arr) || !arr.length) return;
+  const mg=document.createElement('div');
+  mg.className=`post-media media-${Math.min(arr.length,4)}`;
+  arr.slice(0,4).forEach(m=>{
+    const item=document.createElement('div'); item.className='post-media-item';
+    item.innerHTML = m.type==='video'
+      ? `<video src="${esc(m.url)}" muted playsinline preload="metadata"></video>`
+      : `<img src="${esc(m.url)}" alt="" loading="lazy"/>`;
+    item.addEventListener('click',()=>openMediaViewer(m));
+    mg.appendChild(item);
+  });
+  const anchor=card.querySelector('.post-actions');
+  if(anchor) card.insertBefore(mg,anchor); else card.appendChild(mg);
 }
 
 function showNotifBannerOnce(){
@@ -1257,9 +1293,9 @@ function buildPostCard(p){
   const isPoll=p.post_type==='encuesta';
   const isTrans=!isPoll&&!isRaw;
   const displayContent=isRaw?p.content.replace(/^!!POST!!\n?/,''):(p.content||'');
-  let mediaArr=[];try{if(p.media)mediaArr=JSON.parse(p.media);}catch(_){}
   let attachedTrans=null;try{if(p.attached_transcript)attachedTrans=JSON.parse(p.attached_transcript);}catch(_){}
   const div=document.createElement('div');div.className='card post-card';
+  div.dataset.pubId=p.id;
   let followBtnHtml='';
   if(!isOwn){
     if(amF) followBtnHtml=`<button class="follow-pill friends" data-uid="${p.user_id}">⇄ Amigos</button>`;
@@ -1296,7 +1332,6 @@ function buildPostCard(p){
   else{const b=document.createElement('div');b.className='post-body';b.textContent=displayContent;div.appendChild(b);}
 
   if(attachedTrans){const at=document.createElement('div');at.className='msg-transcript';at.innerHTML=`<div class="msg-transcript-title">📄 ${esc(attachedTrans.title||'Transcripción')}</div><div>${esc((attachedTrans.content||'').slice(0,100))}…</div>`;at.addEventListener('click',()=>openFulltext(attachedTrans));div.appendChild(at);}
-  if(mediaArr.length){const mg=document.createElement('div');mg.className=`post-media media-${Math.min(mediaArr.length,4)}`;mediaArr.slice(0,4).forEach(m=>{const item=document.createElement('div');item.className='post-media-item';item.innerHTML=m.type==='video'?`<video src="${esc(m.url)}" muted playsinline preload="metadata"></video>`:`<img src="${esc(m.url)}" alt="" loading="lazy"/>`;item.addEventListener('click',()=>openMediaViewer(m));mg.appendChild(item);});div.appendChild(mg);}
 
   const actions=document.createElement('div');actions.className='post-actions';
   if(isTrans){
@@ -1304,6 +1339,7 @@ function buildPostCard(p){
   }
   actions.innerHTML+=`<button class="post-act" data-comment-post="${p.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comentarios <span class="cmt-count-${p.id}" style="opacity:.6;font-family:var(--mono);">${p.comments_count||0}</span></button><button class="post-act" data-share-post='${JSON.stringify({id:p.id,title:p.title,username:p.username})}'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Compartir</button>`;
   div.appendChild(actions);
+  if(p.media) renderPostMedia(div,p.media);
 
   const cmtSection=document.createElement('div');cmtSection.className='cmt-section';cmtSection.style.display='none';
   const cmtInputRow=document.createElement('div');cmtInputRow.className='cmt-input';cmtInputRow.style.cssText='display:flex;gap:6px;margin-bottom:10px;';
