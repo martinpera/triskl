@@ -447,15 +447,19 @@ export default async function handler(req, res) {
     // ========== FEED PAGINADO (cursor por created_at) ==========
     if (action === "feed") {
       const scope  = req.query.scope || "gen";                 // gen | friends | mine
-      const limit  = Math.min(parseInt(req.query.limit || "12", 10) || 12, 30);
+      const limit  = Math.min(parseInt(req.query.limit || "20", 10) || 20, 50);
       const before = req.query.before || null;
 
       const viewer = await getViewer(jwt, auto);
       if (!viewer) return res.status(401).json({ error: "No autenticado" });
       const viewerKey = viewer.gen === null ? 2009 : viewer.gen;
 
-      // select=* para no depender de nombres de columna concretos.
-      const COLS = "*,user:user_id(id,username,avatar_url,xp,level,gen)";
+      // media=0 -> no arrastramos los base64; el front los pide aparte por lote.
+      const EMBED    = "user:user_id(id,username,avatar_url,xp,level,gen)";
+      const LIGHT    = "id,user_id,username,title,materia,content,visibility,post_type,"
+                     + "created_at,comments_count,poll_options,poll_votes,poll_voters," + EMBED;
+      const FULL     = "*," + EMBED;
+      let   COLS     = req.query.media === "0" ? LIGHT : FULL;
 
       let filter;
       if (scope === "mine") {
@@ -473,21 +477,32 @@ export default async function handler(req, res) {
         filter = `visibility=eq.todos`;
       }
 
-      const RAW   = limit + 10;
-      const items = [];
-      let cursor  = before;
-      let hasMore = true;
+      const RAW      = limit + 15;
+      const items    = [];
+      let   lastSeen = before;   // created_at de la ULTIMA fila mirada (aceptada o descartada)
+      let   hasMore  = true;
 
-      for (let i = 0; i < 5 && items.length < limit && hasMore; i++) {
+      for (let i = 0; i < 8 && items.length < limit; i++) {
         let params = `${filter}&order=created_at.desc&limit=${RAW}&select=${COLS}`;
-        if (cursor) params += `&created_at=lt.${encodeURIComponent(cursor)}`;
+        if (lastSeen) params += `&created_at=lt.${encodeURIComponent(lastSeen)}`;
 
-        const rows = await auto(j => sbGet("publications", params, j));
+        let rows;
+        try {
+          rows = await auto(j => sbGet("publications", params, j));
+        } catch (e) {
+          // Si el select liviano falla por alguna columna, reintentamos con *.
+          if (COLS === LIGHT) {
+            COLS   = FULL;
+            params = params.replace(`select=${LIGHT}`, `select=${FULL}`);
+            rows   = await auto(j => sbGet("publications", params, j));
+          } else throw e;
+        }
+
         if (!rows || !rows.length) { hasMore = false; break; }
-        if (rows.length < RAW) hasMore = false;
-        cursor = rows[rows.length - 1].created_at;
+        const fullBatch = rows.length === RAW;
 
         for (const p of rows) {
+          lastSeen = p.created_at;
           if (scope === "gen" && p.user_id !== viewer.id) {
             const authorKey = (p.user?.gen ?? null) === null ? 2009 : p.user.gen;
             if (authorKey !== viewerKey) continue;
@@ -495,13 +510,21 @@ export default async function handler(req, res) {
           items.push(p);
           if (items.length >= limit) break;
         }
+
+        if (items.length >= limit) break;
+        if (!fullBatch) { hasMore = false; break; }
       }
 
-      return res.status(200).json({
-        items,
-        next_cursor: items.length ? items[items.length - 1].created_at : cursor,
-        has_more: hasMore && items.length >= limit,
-      });
+      return res.status(200).json({ items, next_cursor: lastSeen, has_more: hasMore });
+    }
+
+    // Media (base64) de un lote de posts. El feed lo pide aparte para pintar el texto ya.
+    if (action === "feed-media") {
+      const ids = String(req.query.ids || "").split(",").map(x => x.trim()).filter(Boolean);
+      if (!ids.length) return res.status(200).json([]);
+      const rows = await auto(j => sbGet("publications",
+        `id=in.(${ids.join(",")})&select=id,media`, j)).catch(() => []);
+      return res.status(200).json((rows || []).filter(r => r.media));
     }
 
     // ========== PUBLICACIONES ==========
