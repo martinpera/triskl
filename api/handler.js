@@ -454,12 +454,8 @@ export default async function handler(req, res) {
       if (!viewer) return res.status(401).json({ error: "No autenticado" });
       const viewerKey = viewer.gen === null ? 2009 : viewer.gen;
 
-      const COLS = [
-        "id", "user_id", "username", "title", "materia", "content", "visibility",
-        "post_type", "created_at", "comments_count", "poll_options", "poll_votes",
-        "poll_voters", "attached_transcript", "media",
-        "user:user_id(id,username,avatar_url,xp,level,gen)"
-      ].join(",");
+      // select=* para no depender de nombres de columna concretos.
+      const COLS = "*,user:user_id(id,username,avatar_url,xp,level,gen)";
 
       let filter;
       if (scope === "mine") {
