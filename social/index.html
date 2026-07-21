@@ -1344,7 +1344,7 @@ function buildAv(username,avatarUrl,size='av-sm',extraStyle=''){
 function isJWTExpired(){try{const e=SESSION?.expires_at;if(!e)return false;return Date.now()>(e>1e12?e:e*1000)-30000;}catch(_){return false;}}
 async function refreshSession(){const rt=SESSION?.refresh_token;if(!rt)return false;try{const d=await fetch(`${API}?action=refresh-token`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:rt})}).then(r=>r.json());if(d?.jwt){SESSION={...SESSION,jwt:d.jwt,refresh_token:d.refresh_token||SESSION.refresh_token,expires_at:d.expires_at||SESSION.expires_at};localStorage.setItem(LS,JSON.stringify(SESSION));return true;}}catch(_){}return false;}
 async function ensureJWT(){if(!isJWTExpired())return;if(await refreshSession())return;try{const r=await fetch(`${API}?action=verify-session`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jwt:SESSION?.jwt})}).then(r=>r.json());if(r?.jwt){SESSION={...SESSION,...r};localStorage.setItem(LS,JSON.stringify(SESSION));}}catch(_){}}
-function _auth(){return {uuid:SESSION?.id||SESSION?.uuid||null,password:SESSION?.password||''};}
+function _auth(){return {uuid:SESSION?.id||SESSION?.uuid||null,username:SESSION?.username||null,password:SESSION?.password||''};}
 async function apiGet(url){try{return await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(_auth())}).then(r=>r.json());}catch(_){return [];}}
 async function apiPost(action,body){try{return await fetch(`${API}?action=${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({..._auth(),...(body||{})})}).then(r=>r.json());}catch(_){return {};}}
 
@@ -1376,7 +1376,7 @@ async function registerSW(){
 }
 async function checkExistingSubscription(){
   try{
-    const data=await fetch(`${API}?action=check-push-subscription&user_id=${SESSION.id}`).then(r=>r.json());
+    const data=await apiGet(`${API}?action=check-push-subscription&user_id=${SESSION.id}`);
     if(data.has_subscription){updateNotifStatusInProfile(true);return;}
     if(Notification.permission==='default')setTimeout(()=>openModal('notisPromptModal'),1500);
   }catch(e){}
@@ -1640,7 +1640,7 @@ function showNotifBannerOnce(){
   if(sessionStorage.getItem('triskl_notif_banner_dismissed'))return;
   (async()=>{
     try{
-      const d=await fetch(`${API}?action=check-push-subscription&user_id=${SESSION.id}`).then(r=>r.json());
+      const d=await apiGet(`${API}?action=check-push-subscription&user_id=${SESSION.id}`);
       if(d.has_subscription||Notification.permission==='denied')return;
       if(document.getElementById('feedNotifBanner'))return;
       const scroll=document.getElementById('feedScroll');
@@ -3255,7 +3255,7 @@ async function loadProfile(){
   const fcount=Array.isArray(fol)?fol.length:0,focount=Array.isArray(fors)?fors.length:0;
 
   let hasPush=false;
-  try{const subData=await fetch(`${API}?action=check-push-subscription&user_id=${SESSION.id}`).then(r=>r.json());hasPush=subData.has_subscription;}catch(e){}
+  try{const subData=await apiGet(`${API}?action=check-push-subscription&user_id=${SESSION.id}`);hasPush=subData.has_subscription;}catch(e){}
 
   scroll.innerHTML=`
     <div class="profile-hero">
