@@ -240,7 +240,7 @@
   try { SESSION = JSON.parse(localStorage.getItem(LS)); } catch (_) { SESSION = null; }
   if (!SESSION?.id) { location.href = '/'; }
 
-  function _auth() { return { uuid: SESSION?.id || SESSION?.uuid || null, password: SESSION?.password || '' }; }
+  function _auth() { return { uuid: SESSION?.id || SESSION?.uuid || null, username: SESSION?.username || null, password: SESSION?.password || '' }; }
 
   // ── Parseo de URL estilo /chat?<id>?type=doc  (NUNCA /chat/) ──
   function parseDoc() {
@@ -497,4 +497,4 @@
   setTimeout(() => inputEl.focus(), 200);
 </script>
 </body>
-</html>
+</html>v
