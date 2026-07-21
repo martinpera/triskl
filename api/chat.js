@@ -1,19 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────
-// /api/chat.js — Endpoint dedicado al chat con IA (Triskl).
-// AHORA USA LA IA DE SERVO (SERVO.COM.UY) SIN SYSTEM PROMPT.
-// El historial es exactamente el mismo que el del endpoint original de Servo.
-// Bloquea palabras prohibidas en mensajes y respuestas.
+// /api/chat.js — Endpoint que usa la IA de Servo SIN contexto fijo de SERVO.
+// El historial enviado es solo el historial real de la conversación.
+// Bloquea palabras prohibidas y reintenta si la respuesta contiene "servo".
 // ─────────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL          = process.env.LINKTR;
 const SUPABASE_ANON         = process.env.ANONTR;
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
 
-// Configuración de la API de Servo
+// ─── Configuración de la API de Servo ──────────────────────────────────────
 const SERVO_API = 'https://servo.com.uy/api/support/chat';
 const MAX_RETRIES = 20;
 
-// Palabras a bloquear (detección insensible a mayúsculas)
+// ─── Palabras a bloquear (insensible a mayúsculas) ──────────────────────
 const BLOCKED_WORDS = ['servo', 'plataforma', 'marketplace', 'marketplace de servicios'];
 const blockedRegex = new RegExp(BLOCKED_WORDS.join('|'), 'i');
 
@@ -139,7 +138,7 @@ async function withAutoRefresh(jwt, refreshToken, fn, relogin = null) {
 }
 
 // ─── AUTH por username + uuid + password ──────────────────────────────────
-const _sessCache = new Map(); // key: `${uuid}:${password}` -> { jwt, refreshToken, expiresAt, user }
+const _sessCache = new Map();
 
 async function loginByUuidPassword(uuid, password) {
   const rows = await sbAdminGet(
@@ -194,11 +193,10 @@ async function resolveAuth(req) {
   return _mkAuthCtx(uuid, password, sess);
 }
 
-// ─── LLM: Ahora usa la API de Servo (sin system prompt) ──────────────────
+// ─── LLM: llamada a Servo SIN contexto fijo ──────────────────────────────
 async function callServo(userMessage, conversationHistory) {
-  // userMessage: string (el último mensaje del usuario)
-  // conversationHistory: array de { role, content } (historial anterior)
-
+  // conversationHistory: array de { role, content } (mensajes previos)
+  // Se envía tal cual, sin añadir ningún prefijo.
   const payload = {
     message: userMessage,
     conversationHistory: conversationHistory || []
@@ -227,13 +225,12 @@ async function callServo(userMessage, conversationHistory) {
         data.response ||
         JSON.stringify(data);
 
-      // Verificar si contiene palabras bloqueadas
-      if (!blockedRegex.test(responseText)) {
-        break; // respuesta válida, salimos
+      // Si NO contiene "servo" (insensible a mayúsculas) → salimos
+      if (!/servo/i.test(responseText)) {
+        break;
       }
 
       retries++;
-      // Pequeña pausa entre reintentos
       await new Promise(resolve => setTimeout(resolve, 500));
     } catch (err) {
       console.error('Error en llamada a Servo:', err);
@@ -332,15 +329,11 @@ export default async function handler(req, res) {
 
     // ─── Enviar mensaje (principal) ──────────────────────────────────────
     if (action === "ai-chat") {
-      const {
-        chat_id,
-        message,
-        // context, contextText, attachments, materia ya no se usan (se ignoran)
-      } = req.body;
+      const { chat_id, message } = req.body;
 
       if (!message) return res.status(400).json({ error: "Falta el mensaje" });
 
-      // ── BLOQUEO: detectar palabras prohibidas en el mensaje del usuario ──
+      // ── BLOQUEO en mensaje del usuario ──────────────────────────────────
       if (blockedRegex.test(message)) {
         return res.status(400).json({
           error: "No se permiten preguntas sobre esos temas (servo, plataforma, marketplace, marketplace de servicios)."
@@ -351,38 +344,35 @@ export default async function handler(req, res) {
       let chat;
       if (chat_id) {
         const rows = await auto(j => sbGet("ai_chats", `id=eq.${chat_id}&username=eq.${username}`, j));
-        chat = rows && rows[0];
+        chat = rows && rows[0] ? rows[0] : null;
         if (!chat) return res.status(404).json({ error: "Conversación no encontrada" });
       } else {
-        // Si no hay chat_id, se crea uno nuevo con título genérico
         const newChat = {
-          id: crypto.randomUUID(), user_id: authCtx.user.id, username,
-          materia: null, // ya no se usa materia
+          id: crypto.randomUUID(),
+          user_id: authCtx.user.id,
+          username,
+          materia: null,
           title: "Nueva conversación",
-          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
         const created = await auto(j => sbPost("ai_chats", newChat, j));
         chat = Array.isArray(created) ? created[0] : created;
       }
 
-      // 2) Obtener el historial real de la conversación (sin system ni prefijos)
+      // 2) Obtener historial real de la conversación (mensajes anteriores)
       const priorMessages = await auto(j => sbGet("ai_chat_messages",
         `chat_id=eq.${chat.id}&order=created_at.asc&select=role,content`, j
       ));
 
-      // 3) Construir el historial para Servo (exactamente como lo hacía el segundo handler)
-      //    priorMessages ya tiene { role, content } para cada mensaje.
-      const conversationHistory = priorMessages.map(m => ({ role: m.role, content: m.content }));
+      // 3) Llamar a Servo con el mensaje y el historial (sin ningún prefijo)
+      const replyText = await callServo(message, priorMessages);
 
-      // 4) Llamar a la IA de Servo con el mensaje actual y el historial
-      const replyText = await callServo(message, conversationHistory);
-
-      // ── BLOQUEO: verificar que la respuesta no contenga palabras prohibidas ──
+      // ── BLOQUEO adicional en respuesta ──────────────────────────────────
       if (blockedRegex.test(replyText)) {
-        // Si aún contiene, forzamos un mensaje genérico
         const fallback = "Lo siento, no puedo responder a esa pregunta porque contiene términos no permitidos.";
-        // Guardamos igualmente la respuesta de fallback (opcional, pero evita que se vea la original)
         const nowIso = new Date().toISOString();
+        // Guardamos el mensaje del usuario y la respuesta de fallback
         await auto(j => sbPost("ai_chat_messages", {
           id: crypto.randomUUID(), chat_id: chat.id, role: "user", content: message, created_at: nowIso,
         }, j));
@@ -395,7 +385,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ chat_id: chat.id, response: fallback, reply: fallback });
       }
 
-      // 5) Guardar mensaje del usuario y respuesta en la base de datos
+      // 4) Guardar mensaje y respuesta en Supabase
       const nowIso = new Date().toISOString();
       await auto(j => sbPost("ai_chat_messages", {
         id: crypto.randomUUID(), chat_id: chat.id, role: "user", content: message, created_at: nowIso,
