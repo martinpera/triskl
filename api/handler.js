@@ -1364,6 +1364,15 @@ export default async function handler(req, res) {
       return res.status(200).json(rows || []);
     }
 
+    // Todos los apuntes del usuario, sin filtrar por materia (para el selector de contexto del chat).
+    if (action === "all-annotations") {
+      const user_id = req.query.user_id;
+      if (!user_id) return res.status(400).json({ error: "user_id requerido" });
+      const rows = await auto(j => sbGet("annotations",
+        `user_id=eq.${user_id}&order=created_at.desc&select=id,materia,type,content,created_at`, j));
+      return res.status(200).json(rows || []);
+    }
+
     if (action === "create-annotation") {
       const { user_id, username, materia, type, content, drawing_data, ai_question, source_session_id } = req.body;
       if (!user_id || !materia || !type) return res.status(400).json({ error: "user_id, materia y type requeridos" });
