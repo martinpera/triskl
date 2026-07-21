@@ -182,20 +182,24 @@ function _mkAuthCtx(uuid, password, sess) {
   };
 }
 
-// Devuelve el contexto de auth, o null si no vinieron uuid+password
-// (en ese caso el handler usa el JWT del header, flujo legacy).
+// Devuelve el contexto de auth, o null si no vinieron username+uuid+password,
+// o si el username no coincide con el dueño real de ese uuid.
+// TODA acción protegida exige los tres campos (ver PUBLIC_ACTIONS más abajo).
 async function resolveAuth(req) {
   const b = req.body || {};
-  const uuid = b.uuid || b.user_id || b.id || null;
+  const uuid     = b.uuid || b.user_id || b.id || null;
   const password = b.password || null;
-  if (!uuid || !password) return null;
+  const username  = (b.username || "").toString().trim().toLowerCase() || null;
+  if (!uuid || !password || !username) return null;
 
   const key = `${uuid}:${password}`;
   const cached = _sessCache.get(key);
   if (cached && cached.expiresAt > Date.now() + 60_000) {
+    if (!cached.user || cached.user.username.toLowerCase() !== username) return null;
     return _mkAuthCtx(uuid, password, cached);
   }
   const sess = await loginByUuidPassword(uuid, password);
+  if (!sess.user || sess.user.username.toLowerCase() !== username) return null;
   _sessCache.set(key, sess);
   return _mkAuthCtx(uuid, password, sess);
 }
@@ -279,6 +283,15 @@ async function ensureUserProfile(uid, email, username, jwt, gen = null) {
   }
 }
 
+// Acciones que se ejecutan ANTES de tener sesión (login/registro/health/etc).
+// Todo lo demás exige username + uuid + password en el body, siempre.
+const PUBLIC_ACTIONS = new Set([
+  "login", "register", "verify-otp", "resend-otp", "refresh-token",
+  "verify-session", "health", "branding", "sse",
+  // "sse" queda público porque es un EventSource nativo del navegador y no
+  // puede mandar body con auth; solo expone lo que el propio user_id ya podía ver.
+]);
+
 // ─── Handler principal ───────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -288,10 +301,16 @@ export default async function handler(req, res) {
 
   const action = req.query.action || (req.body && req.body.action) || "";
 
-  // Motor de auth: uuid + password por POST. Fallback al JWT del header (legacy).
+  // Motor de auth: username + uuid + password por POST, en TODAS las acciones
+  // salvo las de PUBLIC_ACTIONS. Ya no hay fallback a JWT de header (legacy).
   const authCtx = await resolveAuth(req).catch(() => null);
-  const jwt          = authCtx?.jwt          || (req.headers.authorization || "").replace("Bearer ", "") || null;
-  const refreshToken = authCtx?.refreshToken || req.headers["x-refresh-token"] || null;
+
+  if (!PUBLIC_ACTIONS.has(action) && (!authCtx || !authCtx.user)) {
+    return res.status(401).json({ error: "username, uuid y password son requeridos" });
+  }
+
+  const jwt          = authCtx?.jwt          || null;
+  const refreshToken = authCtx?.refreshToken || null;
   const relogin      = authCtx?.relogin      || null;
 
   const auto = (fn) => withAutoRefresh(jwt, refreshToken, fn, relogin);
@@ -480,6 +499,30 @@ export default async function handler(req, res) {
         refresh_token: data.refresh_token || refresh_token,
         expires_at: data.expires_at || 0
       });
+    }
+
+    if (action === "change-password") {
+      // authCtx ya validó username+uuid+password actuales (si no, 401 arriba).
+      const { new_password } = req.body;
+      if (!new_password || String(new_password).length < 6) {
+        return res.status(400).json({ error: "La nueva contraseña debe tener al menos 6 caracteres" });
+      }
+      const updRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON,
+          "Authorization": `Bearer ${authCtx.jwt}`,
+        },
+        body: JSON.stringify({ password: new_password }),
+      });
+      const updData = await updRes.json().catch(() => ({}));
+      if (!updRes.ok) {
+        return res.status(400).json({ error: updData.msg || updData.error_description || "No se pudo cambiar la contraseña" });
+      }
+      // La sesión cacheada con la password vieja queda inválida; se descarta.
+      _sessCache.delete(`${req.body.uuid || req.body.user_id || req.body.id}:${req.body.password}`);
+      return res.status(200).json({ ok: true });
     }
 
     // ========== PUSH SUBSCRIPTIONS ==========
@@ -1352,34 +1395,108 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // ========== CHAT IA (Triskl) ==========
-    if (action === "ai-chat") {
-      // Requiere auth por uuid + password (resolveAuth arriba).
-      if (!authCtx || !authCtx.user) {
-        return res.status(401).json({ error: "uuid y password requeridos" });
+    // ========== CHAT IA (Triskl) — persistente, estilo Instagram ==========
+    // Tablas nuevas requeridas en Supabase:
+    //   ai_chats(id uuid pk, user_id uuid, username text, materia text,
+    //            title text, last_message text, created_at timestamptz,
+    //            updated_at timestamptz, closed_at timestamptz null)
+    //   ai_chat_messages(id uuid pk, chat_id uuid fk->ai_chats.id, role text,
+    //            content text, created_at timestamptz)
+    // NUNCA se devuelve user_id en las respuestas de estas acciones: el dueño
+    // del chat se resuelve server-side por username (authCtx.user.username) y
+    // se verifica en cada consulta, así que un chat ajeno jamás es accesible.
+
+    // Lista de conversaciones con la IA del usuario logueado (inbox).
+    if (action === "ai-chats-list") {
+      const username = authCtx.user.username;
+      const rows = await auto(j => sbGet("ai_chats",
+        `username=eq.${username}&order=updated_at.desc&select=id,materia,title,last_message,created_at,updated_at,closed_at`, j
+      )).catch(() => []);
+      return res.status(200).json(rows || []);
+    }
+
+    // Abre una conversación puntual (o la última abierta si no se pasa chat_id).
+    if (action === "ai-chat-open") {
+      const username = authCtx.user.username;
+      let { chat_id, materia } = req.body;
+
+      let chatRow = null;
+      if (chat_id) {
+        const rows = await auto(j => sbGet("ai_chats", `id=eq.${chat_id}&username=eq.${username}`, j)).catch(() => []);
+        chatRow = rows && rows[0] ? rows[0] : null;
+        if (!chatRow) return res.status(404).json({ error: "Conversación no encontrada" });
+      } else {
+        let params = `username=eq.${username}&closed_at=is.null&order=updated_at.desc&limit=1`;
+        if (materia) params += `&materia=eq.${encodeURIComponent(materia)}`;
+        const rows = await auto(j => sbGet("ai_chats", params, j)).catch(() => []);
+        chatRow = rows && rows[0] ? rows[0] : null;
       }
 
+      if (!chatRow) return res.status(200).json({ chat: null, messages: [] });
+
+      const messages = await auto(j => sbGet("ai_chat_messages",
+        `chat_id=eq.${chatRow.id}&order=created_at.asc&select=id,role,content,created_at`, j
+      )).catch(() => []);
+
+      const { user_id, ...safeChat } = chatRow;
+      return res.status(200).json({ chat: safeChat, messages: messages || [] });
+    }
+
+    // Finaliza (cierra) la conversación actual; queda visible en el historial.
+    if (action === "ai-chat-finish") {
+      const username = authCtx.user.username;
+      const { chat_id } = req.body;
+      if (!chat_id) return res.status(400).json({ error: "chat_id requerido" });
+      await auto(j => sbPatch("ai_chats", `id=eq.${chat_id}&username=eq.${username}`,
+        { closed_at: new Date().toISOString() }, j));
+      return res.status(200).json({ ok: true });
+    }
+
+    // Borra una conversación entera del historial.
+    if (action === "ai-chat-delete") {
+      const username = authCtx.user.username;
+      const { chat_id } = req.body;
+      if (!chat_id) return res.status(400).json({ error: "chat_id requerido" });
+      await auto(j => sbDelete("ai_chat_messages", `chat_id=eq.${chat_id}`, j)).catch(() => null);
+      await auto(j => sbDelete("ai_chats", `id=eq.${chat_id}&username=eq.${username}`, j));
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === "ai-chat") {
+      // authCtx ya está validado (401 arriba si no vino username+uuid+password).
+      const username = authCtx.user.username;
       const {
-        message,              // texto de la última pregunta (compat frontend viejo)
-        messages,             // historial completo [{role, content}] (opcional)
-        conversationHistory,  // compat: historial del frontend viejo
+        chat_id,              // conversación a la que se agrega el turno (opcional → crea una)
+        message,              // texto de la última pregunta
         context,              // [{title, type, text}] transcripciones / apuntes / material
         contextText,          // alternativa: un solo string de contexto
         attachments,          // [{name, media_type, data(base64)}] pdf / imágenes
         materia,
       } = req.body;
 
-      // 1) Historial previo
-      let history = [];
-      if (Array.isArray(messages) && messages.length) history = messages.slice();
-      else if (Array.isArray(conversationHistory)) history = conversationHistory.slice();
-
-      // 2) Última pregunta del usuario
-      let userText = message;
-      if (!userText && history.length && history[history.length - 1].role === "user") {
-        userText = history.pop().content;
-      }
+      const userText = message;
       if (!userText) return res.status(400).json({ error: "Falta el mensaje" });
+
+      // 1) Resolver o crear la conversación (siempre acotada al username dueño).
+      let chat;
+      if (chat_id) {
+        const rows = await auto(j => sbGet("ai_chats", `id=eq.${chat_id}&username=eq.${username}`, j)).catch(() => []);
+        chat = rows && rows[0];
+        if (!chat) return res.status(404).json({ error: "Conversación no encontrada" });
+      } else {
+        const newChat = {
+          id: crypto.randomUUID(), user_id: authCtx.user.id, username,
+          materia: materia || null, title: materia || "Nueva conversación",
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        };
+        const created = await auto(j => sbPost("ai_chats", newChat, j));
+        chat = Array.isArray(created) ? created[0] : created;
+      }
+
+      // 2) Historial real de la conversación (fuente de verdad = la base, no el cliente).
+      const priorMessages = await auto(j => sbGet("ai_chat_messages",
+        `chat_id=eq.${chat.id}&order=created_at.asc&select=role,content`, j
+      )).catch(() => []);
 
       // 3) Material adjunto (texto)
       let materialText = "";
@@ -1416,9 +1533,9 @@ export default async function handler(req, res) {
       const preface = materialText ? `MATERIAL DE LA CLASE:\n${materialText}\n\n---\n\n` : "";
       userBlocks.push({ type: "text", text: `${preface}PREGUNTA: ${userText}` });
 
-      // 6) Mensajes para el LLM
+      // 6) Mensajes para el LLM (historial real + turno actual)
       const llmMessages = [
-        ...history
+        ...(priorMessages || [])
           .filter(m => m && (m.role === "user" || m.role === "assistant") && m.content)
           .map(m => ({ role: m.role, content: String(m.content) })),
         { role: "user", content: userBlocks },
@@ -1426,8 +1543,21 @@ export default async function handler(req, res) {
 
       try {
         const replyText = await callLLM({ system, messages: llmMessages });
-        // `response` y `reply` para ser compatible con el frontend actual.
-        return res.status(200).json({ response: replyText, reply: replyText });
+        const nowIso = new Date().toISOString();
+
+        // Persistir ambos turnos.
+        await auto(j => sbPost("ai_chat_messages", {
+          id: crypto.randomUUID(), chat_id: chat.id, role: "user", content: userText, created_at: nowIso,
+        }, j)).catch(() => null);
+        await auto(j => sbPost("ai_chat_messages", {
+          id: crypto.randomUUID(), chat_id: chat.id, role: "assistant", content: replyText, created_at: nowIso,
+        }, j)).catch(() => null);
+        await auto(j => sbPatch("ai_chats", `id=eq.${chat.id}`, {
+          updated_at: nowIso, last_message: replyText.slice(0, 140),
+        }, j)).catch(() => null);
+
+        // `response` y `reply` para compatibilidad con el frontend actual.
+        return res.status(200).json({ chat_id: chat.id, response: replyText, reply: replyText });
       } catch (err) {
         console.error("[ai-chat ERROR]", err.message);
         return res.status(502).json({ error: "No se pudo obtener respuesta de la IA", detail: err.message });
