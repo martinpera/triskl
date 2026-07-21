@@ -1,29 +1,20 @@
 // ─────────────────────────────────────────────────────────────────────────
 // /api/chat.js — Endpoint dedicado al chat con IA (Triskl).
-// Separado de handler.js a propósito: lo usan tanto la página de asistente
-// (chat de página completa) como el modal del transcriptor.
-//
-// TODA acción acá exige username + uuid + password en el body (sin
-// excepciones — este endpoint no tiene acciones públicas/pre-login).
-//
-// Tablas requeridas en Supabase (crear antes de usar, si no vas a ver 500):
-//   ai_chats(
-//     id uuid primary key, user_id uuid, username text, materia text,
-//     title text, last_message text,
-//     created_at timestamptz, updated_at timestamptz, closed_at timestamptz
-//   )
-//   ai_chat_messages(
-//     id uuid primary key, chat_id uuid references ai_chats(id) on delete cascade,
-//     role text, content text, created_at timestamptz
-//   )
+// AHORA USA LA IA DE SERVO (SERVO.COM.UY) EN LUGAR DE ANTHROPIC.
+// Bloquea palabras prohibidas en mensajes y respuestas.
 // ─────────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL          = process.env.LINKTR;
 const SUPABASE_ANON         = process.env.ANONTR;
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
 
-const AI_KEY   = process.env.ANTHROPIC_KEY || process.env.CLAUDE_KEY || "";
-const AI_MODEL = process.env.AI_MODEL || "claude-sonnet-4-5";
+// Configuración de la API de Servo
+const SERVO_API = 'https://servo.com.uy/api/support/chat';
+const MAX_RETRIES = 20;
+
+// Palabras a bloquear (detección insensible a mayúsculas)
+const BLOCKED_WORDS = ['servo', 'plataforma', 'marketplace', 'marketplace de servicios'];
+const blockedRegex = new RegExp(BLOCKED_WORDS.join('|'), 'i');
 
 // ─── Headers ────────────────────────────────────────────────────────────────
 function authHeaders(jwt) {
@@ -146,7 +137,7 @@ async function withAutoRefresh(jwt, refreshToken, fn, relogin = null) {
   }
 }
 
-// ─── AUTH por username + uuid + password (obligatorio, siempre) ────────────
+// ─── AUTH por username + uuid + password ──────────────────────────────────
 const _sessCache = new Map(); // key: `${uuid}:${password}` -> { jwt, refreshToken, expiresAt, user }
 
 async function loginByUuidPassword(uuid, password) {
@@ -183,7 +174,6 @@ function _mkAuthCtx(uuid, password, sess) {
   };
 }
 
-// Exige username + uuid + password SIEMPRE (no hay acciones públicas acá).
 async function resolveAuth(req) {
   const b = req.body || {};
   const uuid     = b.uuid || b.user_id || b.id || null;
@@ -203,32 +193,78 @@ async function resolveAuth(req) {
   return _mkAuthCtx(uuid, password, sess);
 }
 
-// ─── LLM (Anthropic) ─────────────────────────────────────────────────────────
-async function callLLM({ system, messages, maxTokens = 1200 }) {
-  if (!AI_KEY) throw new Error("Falta ANTHROPIC_KEY en variables de entorno");
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": AI_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({ model: AI_MODEL, max_tokens: maxTokens, system, messages }),
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`LLM ${res.status}: ${t.slice(0, 300)}`);
+// ─── LLM: Ahora usa la API de Servo ────────────────────────────────────────
+async function callServo(system, messages) {
+  // messages: array de { role, content } (user/assistant)
+  // system: string con instrucciones (se pondrá como assistant al inicio)
+
+  // Construir historial de conversación para Servo
+  const conversationHistory = [];
+  // Agregar system como primer mensaje del asistente
+  if (system) {
+    conversationHistory.push({ role: 'assistant', content: `Instrucción: ${system}` });
   }
-  const data = await res.json();
-  const text = (data.content || [])
-    .filter(b => b.type === "text")
-    .map(b => b.text)
-    .join("\n")
-    .trim();
-  return text || "No obtuve respuesta.";
+  // Agregar historial real (sin el mensaje del usuario actual)
+  for (const m of messages) {
+    if (m.role === 'user' || m.role === 'assistant') {
+      conversationHistory.push({ role: m.role, content: m.content });
+    }
+  }
+  // El último mensaje de 'messages' podría ser el usuario actual, pero lo pasamos aparte.
+  // Extraemos el último mensaje (asumimos que es del usuario) y lo usamos como 'message'.
+  const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+  const userMessage = (lastMsg && lastMsg.role === 'user') ? lastMsg.content : '';
+
+  // Payload para Servo
+  const payload = {
+    message: userMessage,
+    conversationHistory: conversationHistory
+  };
+
+  let retries = 0;
+  let responseText = '';
+
+  while (retries < MAX_RETRIES) {
+    try {
+      const response = await fetch(SERVO_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API de Servo respondió con ${response.status}`);
+      }
+
+      const data = await response.json();
+      responseText =
+        data.reply ||
+        data.message ||
+        data.content ||
+        data.response ||
+        JSON.stringify(data);
+
+      // Verificar si contiene palabras bloqueadas
+      if (!blockedRegex.test(responseText)) {
+        break; // respuesta válida, salimos
+      }
+
+      retries++;
+      // Pequeña pausa entre reintentos
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (err) {
+      console.error('Error en llamada a Servo:', err);
+      retries++;
+      if (retries >= MAX_RETRIES) {
+        responseText = '⚠️ No se pudo obtener una respuesta válida después de varios intentos.';
+      }
+    }
+  }
+
+  return responseText;
 }
 
-// Traduce errores típicos de "tabla no existe" a un mensaje entendible.
+// ─── Traducción de errores de base de datos ──────────────────────────────
 function friendlyDbError(err) {
   const msg = err && err.message || "";
   if (/relation .* does not exist/i.test(msg) || /42P01/.test(msg)) {
@@ -259,7 +295,7 @@ export default async function handler(req, res) {
 
   try {
 
-    // Lista de conversaciones del usuario (inbox, estilo Instagram).
+    // ─── Lista de conversaciones ──────────────────────────────────────────
     if (action === "ai-chats-list") {
       const rows = await auto(j => sbGet("ai_chats",
         `username=eq.${username}&order=updated_at.desc&select=id,materia,title,last_message,created_at,updated_at,closed_at`, j
@@ -267,7 +303,7 @@ export default async function handler(req, res) {
       return res.status(200).json(rows || []);
     }
 
-    // Abre una conversación puntual (o la última abierta si no se pasa chat_id).
+    // ─── Abrir conversación ──────────────────────────────────────────────
     if (action === "ai-chat-open") {
       let { chat_id, materia } = req.body;
 
@@ -293,7 +329,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ chat: safeChat, messages: messages || [] });
     }
 
-    // Finaliza (cierra) una conversación; queda visible en el historial.
+    // ─── Finalizar conversación ──────────────────────────────────────────
     if (action === "ai-chat-finish") {
       const { chat_id } = req.body;
       if (!chat_id) return res.status(400).json({ error: "chat_id requerido" });
@@ -302,7 +338,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // Borra una conversación entera del historial.
+    // ─── Borrar conversación ─────────────────────────────────────────────
     if (action === "ai-chat-delete") {
       const { chat_id } = req.body;
       if (!chat_id) return res.status(400).json({ error: "chat_id requerido" });
@@ -311,7 +347,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // Envía un mensaje (crea la conversación si no existe todavía).
+    // ─── Enviar mensaje (principal) ──────────────────────────────────────
     if (action === "ai-chat") {
       const {
         chat_id,
@@ -324,7 +360,14 @@ export default async function handler(req, res) {
 
       if (!message) return res.status(400).json({ error: "Falta el mensaje" });
 
-      // 1) Resolver o crear la conversación (siempre acotada al username dueño).
+      // ── BLOQUEO: detectar palabras prohibidas en el mensaje del usuario ──
+      if (blockedRegex.test(message)) {
+        return res.status(400).json({
+          error: "No se permiten preguntas sobre esos temas (servo, plataforma, marketplace, marketplace de servicios)."
+        });
+      }
+
+      // 1) Resolver o crear la conversación
       let chat;
       if (chat_id) {
         const rows = await auto(j => sbGet("ai_chats", `id=eq.${chat_id}&username=eq.${username}`, j));
@@ -340,7 +383,7 @@ export default async function handler(req, res) {
         chat = Array.isArray(created) ? created[0] : created;
       }
 
-      // 2) Historial real de la conversación.
+      // 2) Historial real de la conversación
       const priorMessages = await auto(j => sbGet("ai_chat_messages",
         `chat_id=eq.${chat.id}&order=created_at.asc&select=role,content`, j
       ));
@@ -355,7 +398,7 @@ export default async function handler(req, res) {
           .join("\n\n");
       }
 
-      // 4) System prompt de Triskl
+      // 4) System prompt de Triskl (sin palabras bloqueadas)
       const system = [
         "Sos el asistente de estudio de Triskl, una plataforma para estudiantes de Uruguay.",
         "Ayudás a entender la clase: explicás, resumís, hacés esquemas, generás preguntas de repaso y aclarás dudas.",
@@ -366,37 +409,41 @@ export default async function handler(req, res) {
           : "Todavía no hay material adjunto; respondé de forma general y ofrecé ayuda para organizar la clase.",
       ].filter(Boolean).join("\n");
 
-      // 5) Turno actual: material + adjuntos (pdf/imágenes) + pregunta
-      const userBlocks = [];
-      for (const a of (Array.isArray(attachments) ? attachments : [])) {
-        if (!a || !a.data) continue;
-        const mt = a.media_type || "application/octet-stream";
-        if (mt.startsWith("image/")) {
-          userBlocks.push({ type: "image", source: { type: "base64", media_type: mt, data: a.data } });
-        } else if (mt === "application/pdf") {
-          userBlocks.push({ type: "document", source: { type: "base64", media_type: mt, data: a.data } });
-        }
-      }
-      const preface = materialText ? `MATERIAL DE LA CLASE:\n${materialText}\n\n---\n\n` : "";
-      userBlocks.push({ type: "text", text: `${preface}PREGUNTA: ${message}` });
-
-      // 6) Mensajes para el LLM (historial real + turno actual)
+      // 5) Construir mensajes para el LLM (historial real + el nuevo mensaje)
       const llmMessages = [
         ...(priorMessages || [])
           .filter(m => m && (m.role === "user" || m.role === "assistant") && m.content)
           .map(m => ({ role: m.role, content: String(m.content) })),
-        { role: "user", content: userBlocks },
+        { role: "user", content: message }, // el mensaje actual
       ];
 
-      const replyText = await callLLM({ system, messages: llmMessages });
+      // 6) Llamar a la IA de Servo
+      const replyText = await callServo(system, llmMessages);
+
+      // ── BLOQUEO: verificar que la respuesta no contenga palabras prohibidas ──
+      // (callServo ya reintenta, pero por si acaso hacemos un último chequeo)
+      if (blockedRegex.test(replyText)) {
+        // Si aún contiene, forzamos un mensaje genérico
+        return res.status(200).json({
+          chat_id: chat.id,
+          response: "Lo siento, no puedo responder a esa pregunta porque contiene términos no permitidos.",
+          reply: "Lo siento, no puedo responder a esa pregunta porque contiene términos no permitidos."
+        });
+      }
+
       const nowIso = new Date().toISOString();
 
+      // Guardar mensaje del usuario
       await auto(j => sbPost("ai_chat_messages", {
         id: crypto.randomUUID(), chat_id: chat.id, role: "user", content: message, created_at: nowIso,
       }, j));
+
+      // Guardar respuesta del asistente
       await auto(j => sbPost("ai_chat_messages", {
         id: crypto.randomUUID(), chat_id: chat.id, role: "assistant", content: replyText, created_at: nowIso,
       }, j));
+
+      // Actualizar chat
       await auto(j => sbPatch("ai_chats", `id=eq.${chat.id}`, {
         updated_at: nowIso, last_message: replyText.slice(0, 140),
       }, j)).catch(() => null);
