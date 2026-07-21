@@ -770,39 +770,6 @@
     .ai-chat-send:hover { background: #4930d6; }
     .ai-chat-send:disabled { opacity: .4; cursor: default; }
     .ai-chat-send svg { width: 18px; height: 18px; overflow: visible; }
-    #aiChatListView, #aiChatThreadView {
-      display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%;
-    }
-    #aiChatListView.h, #aiChatThreadView.h { display: none; }
-    .ai-chat-back {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 26px; height: 26px; margin-right: 4px; border: none; background: transparent;
-      color: var(--ink); cursor: pointer; flex-shrink: 0;
-    }
-    .ai-chat-back svg { width: 20px; height: 20px; }
-    #aiChatThreadView .sheet-title { display: flex; align-items: center; }
-    .ai-chat-list {
-      flex: 1; overflow-y: auto; padding: 6px 2px; display: flex; flex-direction: column; gap: 2px;
-    }
-    .ai-chat-list-item {
-      display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px;
-      cursor: pointer; text-align: left; background: none; border: none; width: 100%;
-    }
-    .ai-chat-list-item:hover, .ai-chat-list-item:active { background: var(--soft-bg); }
-    .ai-chat-list-avatar {
-      width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
-      background: var(--ia); color: #fff; display: flex; align-items: center; justify-content: center;
-    }
-    .ai-chat-list-avatar svg { width: 20px; height: 20px; }
-    .ai-chat-list-body { flex: 1; min-width: 0; }
-    .ai-chat-list-title { font-size: 13.5px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 6px; }
-    .ai-chat-list-badge { font-size: 10px; font-weight: 500; color: var(--muted); }
-    .ai-chat-list-snippet {
-      font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .ai-chat-list-delete {
-      flex-shrink: 0; border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 6px;
-    }
     .ai-chat-footer { display: flex; gap: 8px; margin-top: 10px; flex-shrink: 0; }
     .ai-chat-footer button {
       flex: 1; height: 38px; border: 0; border-radius: 10px; font-family: var(--f);
@@ -1298,66 +1265,40 @@
   </div>
 </div>
 
-<!-- AI CHAT MODAL — estilo Instagram: inbox de conversaciones + hilo activo -->
+<!-- AI CHAT MODAL -->
 <div class="overlay h" id="aiChatModal">
   <div class="sheet sheet-tall">
-
-    <!-- ░░ VISTA LISTA (inbox) ░░ -->
-    <div id="aiChatListView">
-      <div class="sheet-header">
-        <div class="sheet-title">
-          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <path d="M12 2.5c.35 0 .66.23.76.57l1.3 4.36 4.36 1.3a.79.79 0 0 1 0 1.52l-4.36 1.3-1.3 4.36a.79.79 0 0 1-1.52 0l-1.3-4.36-4.36-1.3a.79.79 0 0 1 0-1.52l4.36-1.3 1.3-4.36c.1-.34.41-.57.76-.57z"/>
-            <path d="M19 14.2c.24 0 .46.16.53.4l.5 1.66 1.66.5a.55.55 0 0 1 0 1.06l-1.66.5-.5 1.66a.55.55 0 0 1-1.06 0l-.5-1.66-1.66-.5a.55.55 0 0 1 0-1.06l1.66-.5.5-1.66c.07-.24.29-.4.53-.4z"/>
-          </svg>
-          Chats con la IA
-        </div>
-        <button class="sheet-close" onclick="closeAIChat()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+    <div class="sheet-header">
+      <div class="sheet-title">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          <path d="M12 2.5c.35 0 .66.23.76.57l1.3 4.36 4.36 1.3a.79.79 0 0 1 0 1.52l-4.36 1.3-1.3 4.36a.79.79 0 0 1-1.52 0l-1.3-4.36-4.36-1.3a.79.79 0 0 1 0-1.52l4.36-1.3 1.3-4.36c.1-.34.41-.57.76-.57z"/>
+          <path d="M19 14.2c.24 0 .46.16.53.4l.5 1.66 1.66.5a.55.55 0 0 1 0 1.06l-1.66.5-.5 1.66a.55.55 0 0 1-1.06 0l-.5-1.66-1.66-.5a.55.55 0 0 1 0-1.06l1.66-.5.5-1.66c.07-.24.29-.4.53-.4z"/>
+        </svg>
+        Preguntar a la IA
       </div>
-      <div class="ai-chat-list" id="aiChatList">
-        <div class="ai-chat-empty" id="aiChatListEmpty">Todavía no tenés conversaciones con la IA.</div>
-      </div>
-      <div class="ai-chat-footer">
-        <button class="btn-finalizar" id="btnNuevaConversacion" style="background:var(--ia);color:#fff;">+ Nueva conversación</button>
-      </div>
+      <button class="sheet-close" onclick="closeAIChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
-
-    <!-- ░░ VISTA HILO (conversación activa) ░░ -->
-    <div id="aiChatThreadView" class="h">
-      <div class="sheet-header">
-        <div class="sheet-title">
-          <button class="ai-chat-back" id="btnVolverLista" aria-label="Volver a la lista">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <span id="aiChatThreadTitle">Preguntar a la IA</span>
-        </div>
-        <button class="sheet-close" onclick="closeAIChat()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <div class="ai-chat-toolbar">
-        <span style="font-size:11px;color:var(--ink-2);">Basado en la transcripción actual</span>
-        <label class="ai-autosave-toggle">
-          <input type="checkbox" id="aiAutosaveToggle" checked />
-          Guardar respuestas como apunte
-        </label>
-      </div>
-      <div class="ai-chat-thread" id="aiChatThread">
-        <div class="ai-chat-empty" id="aiChatEmpty">Escribí tu primera pregunta sobre la clase. Podés seguir la conversación o finalizarla cuando quieras.</div>
-      </div>
-      <div class="ai-chat-inputrow">
-        <textarea class="ai-chat-input" id="aiChatInput" rows="1" placeholder="Escribí tu pregunta…"></textarea>
-        <button class="ai-chat-send" id="aiChatSend">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-      </div>
-      <div class="ai-chat-footer">
-        <button class="btn-finalizar" id="btnFinalizarChat">Finalizar conversación</button>
-      </div>
+    <div class="ai-chat-toolbar">
+      <span style="font-size:11px;color:var(--ink-2);">Basado en la transcripción actual</span>
+      <label class="ai-autosave-toggle">
+        <input type="checkbox" id="aiAutosaveToggle" checked />
+        Guardar respuestas como apunte
+      </label>
     </div>
-
+    <div class="ai-chat-thread" id="aiChatThread">
+      <div class="ai-chat-empty" id="aiChatEmpty">Escribí tu primera pregunta sobre la clase. Podés seguir la conversación o finalizarla cuando quieras.</div>
+    </div>
+    <div class="ai-chat-inputrow">
+      <textarea class="ai-chat-input" id="aiChatInput" rows="1" placeholder="Escribí tu pregunta…"></textarea>
+      <button class="ai-chat-send" id="aiChatSend">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div class="ai-chat-footer">
+      <button class="btn-finalizar" id="btnFinalizarChat">Finalizar conversación</button>
+    </div>
   </div>
 </div>
 
@@ -1722,7 +1663,6 @@
     document.getElementById('wordChip').textContent = '0 palabras';
     renderAllSegments();
     currentAIChatId = null;
-    aiConversation = [];
   }
 
   function handleMatConfirm(v) {
@@ -2858,111 +2798,45 @@
   document.getElementById('btnPub').addEventListener('click', openPub);
 
   // ════════════════════════════════════════════════════════
-  // MODAL DE CHAT IA — inbox de conversaciones + hilo activo (estilo Instagram)
+  // MODAL DE CHAT IA (usa /api/chat, no /api/handler)
   // ════════════════════════════════════════════════════════
-  let aiConversation = [];
+  const CHAT_API = '/api/chat';
+  async function chatPOST(action, body) {
+    try {
+      const res = await fetch(`${CHAT_API}?action=${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ..._auth(), ...(body || {}) })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: data.error || `HTTP ${res.status}` };
+      return data;
+    } catch (e) { return { error: e.message }; }
+  }
+
   let aiAutosave = true;
   let aiSending = false;
-  let currentAIChatId = null;
+  let currentAIChatId = null; // conversación en curso (no se muestra al usuario)
 
   function getContextText() {
     if (!segs.length) return null;
     return segs.map(s => `[${s.ts}] ${s.text}`).join('\n\n');
   }
 
-  function showAIListView() {
-    document.getElementById('aiChatThreadView').classList.add('h');
-    document.getElementById('aiChatListView').classList.remove('h');
-    loadAIChatsList();
-  }
-  function showAIThreadView() {
-    document.getElementById('aiChatListView').classList.add('h');
-    document.getElementById('aiChatThreadView').classList.remove('h');
-    setTimeout(() => document.getElementById('aiChatInput').focus(), 150);
-  }
-
-  function fmtChatDate(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const now = new Date();
-    const sameDay = d.toDateString() === now.toDateString();
-    return sameDay
-      ? d.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })
-      : d.toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit' });
-  }
-
-  async function loadAIChatsList() {
-    const list = document.getElementById('aiChatList');
-    list.innerHTML = '<div class="ai-chat-empty">Cargando…</div>';
-    const chats = await POST('ai-chats-list', {});
-    if (!Array.isArray(chats) || !chats.length) {
-      list.innerHTML = '<div class="ai-chat-empty" id="aiChatListEmpty">Todavía no tenés conversaciones con la IA.</div>';
-      return;
-    }
-    list.innerHTML = '';
-    chats.forEach(c => {
-      const item = document.createElement('button');
-      item.className = 'ai-chat-list-item';
-      item.innerHTML = `
-        <div class="ai-chat-list-avatar">
-          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2.5c.35 0 .66.23.76.57l1.3 4.36 4.36 1.3a.79.79 0 0 1 0 1.52l-4.36 1.3-1.3 4.36a.79.79 0 0 1-1.52 0l-1.3-4.36-4.36-1.3a.79.79 0 0 1 0-1.52l4.36-1.3 1.3-4.36c.1-.34.41-.57.76-.57z"/></svg>
-        </div>
-        <div class="ai-chat-list-body">
-          <div class="ai-chat-list-title">${(c.title || c.materia || 'Conversación')}<span class="ai-chat-list-badge">${c.closed_at ? '· finalizada' : '· activa'}</span></div>
-          <div class="ai-chat-list-snippet">${(c.last_message || 'Sin mensajes aún')} · ${fmtChatDate(c.updated_at)}</div>
-        </div>
-        <span class="ai-chat-list-delete" data-del="${c.id}" title="Eliminar">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-        </span>`;
-      item.querySelector('[data-del]').addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!confirm('¿Eliminar esta conversación?')) return;
-        await POST('ai-chat-delete', { chat_id: c.id });
-        loadAIChatsList();
-      });
-      item.addEventListener('click', () => openAIChatThread(c.id));
-      list.appendChild(item);
-    });
-  }
-
-  async function openAIChatThread(chatId) {
-    const data = await POST('ai-chat-open', { chat_id: chatId || null, materia: (typeof materia !== 'undefined' ? materia : null) });
-    currentAIChatId = (data && data.chat) ? data.chat.id : null;
-    aiConversation = [];
-    const thread = document.getElementById('aiChatThread');
-    thread.innerHTML = '';
-    const msgs = (data && data.messages) || [];
-    if (!msgs.length) {
-      thread.innerHTML = '<div class="ai-chat-empty" id="aiChatEmpty">Escribí tu primera pregunta sobre la clase. Podés seguir la conversación o finalizarla cuando quieras.</div>';
-    } else {
-      msgs.forEach(m => {
-        renderAIThreadAppend(m.role === 'user' ? 'user' : 'bot', m.content);
-        aiConversation.push({ role: m.role, content: m.content });
-      });
-    }
-    document.getElementById('aiChatThreadTitle').textContent = (data && data.chat && (data.chat.title || data.chat.materia)) || 'Preguntar a la IA';
-    showAIThreadView();
-  }
-
-  function startNewAIChat() {
+  function resetAIChat() {
     currentAIChatId = null;
-    aiConversation = [];
     document.getElementById('aiChatThread').innerHTML = '<div class="ai-chat-empty" id="aiChatEmpty">Escribí tu primera pregunta sobre la clase. Podés seguir la conversación o finalizarla cuando quieras.</div>';
     document.getElementById('aiChatInput').value = '';
-    document.getElementById('aiChatThreadTitle').textContent = (typeof materia !== 'undefined' && materia) ? materia : 'Preguntar a la IA';
-    showAIThreadView();
   }
 
   function openAIChat() {
     if (!materia) { openMat(); return; }
     document.getElementById('aiChatModal').classList.remove('h');
-    showAIListView();
+    setTimeout(() => document.getElementById('aiChatInput').focus(), 200);
   }
   function closeAIChat() { document.getElementById('aiChatModal').classList.add('h'); }
   document.getElementById('aiChatModal').addEventListener('click', e => { if (e.target === document.getElementById('aiChatModal')) closeAIChat(); });
   document.getElementById('btnAskQuick').addEventListener('click', openAIChat);
-  document.getElementById('btnNuevaConversacion').addEventListener('click', startNewAIChat);
-  document.getElementById('btnVolverLista').addEventListener('click', showAIListView);
 
   document.getElementById('aiAutosaveToggle').addEventListener('change', e => { aiAutosave = e.target.checked; });
 
@@ -3007,14 +2881,13 @@
 
     input.value = '';
     renderAIThreadAppend('user', question);
-    aiConversation.push({ role: 'user', content: question });
     const pendingEl = renderAIThreadAppend('bot', 'Pensando…', true);
 
     aiSending = true;
     document.getElementById('aiChatSend').disabled = true;
 
     try {
-      const data = await POST('ai-chat', {
+      const data = await chatPOST('ai-chat', {
         chat_id: currentAIChatId,
         message: question,
         contextText: context,
@@ -3023,7 +2896,6 @@
       if (!data || data.error) throw new Error((data && data.error) || 'sin respuesta');
       currentAIChatId = data.chat_id || currentAIChatId;
       const respuesta = data.response || '⚠️ No se pudo obtener respuesta.';
-      aiConversation.push({ role: 'assistant', content: respuesta });
 
       pendingEl.classList.remove('pending');
       pendingEl.textContent = respuesta;
@@ -3056,12 +2928,11 @@
 
   document.getElementById('btnFinalizarChat').addEventListener('click', async () => {
     if (currentAIChatId) {
-      await POST('ai-chat-finish', { chat_id: currentAIChatId });
+      await chatPOST('ai-chat-finish', { chat_id: currentAIChatId });
     }
-    currentAIChatId = null;
-    aiConversation = [];
+    closeAIChat();
+    resetAIChat();
     toast('Conversación finalizada');
-    showAIListView();
   });
 
   // ================================================================
