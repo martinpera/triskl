@@ -178,6 +178,48 @@
     .brand-sub { display: none; }
     .ctx-chip { max-width: 40%; }
   }
+
+  /* ── Panel de conversaciones (inbox estilo Instagram) ── */
+  .chats-overlay {
+    position: fixed; inset: 0; z-index: 200; background: rgba(19,19,20,.35);
+    display: flex; justify-content: flex-end;
+  }
+  .chats-overlay.h { display: none; }
+  .chats-panel {
+    width: 100%; max-width: 360px; height: 100%; background: var(--card);
+    display: flex; flex-direction: column; animation: slideIn .2s ease both;
+    border-left: 1px solid var(--line-hi);
+  }
+  @keyframes slideIn { from { transform: translateX(24px); opacity: .4; } to { transform: none; opacity: 1; } }
+  .chats-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 15px;
+  }
+  .chats-new {
+    margin: 12px 16px 4px; padding: 10px; border: none; border-radius: 12px;
+    background: var(--ia); color: #fff; font-weight: 700; font-size: 13.5px;
+    cursor: pointer; font-family: var(--f);
+  }
+  .chats-new:hover { background: #4930d6; }
+  .chats-list { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .chats-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 20px; }
+  .chat-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px;
+    cursor: pointer; border: none; background: none; width: 100%; text-align: left;
+  }
+  .chat-item:hover, .chat-item.active { background: var(--soft-bg); }
+  .chat-item-avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; background: var(--ia); color: #fff;
+    display: grid; place-items: center; font-weight: 800; font-size: 13px;
+  }
+  .chat-item-body { flex: 1; min-width: 0; }
+  .chat-item-title { font-size: 13.5px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+  .chat-item-title .status { font-size: 10px; font-weight: 600; color: var(--muted); }
+  .chat-item-snippet { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item-del {
+    flex-shrink: 0; border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 6px;
+  }
+  .chat-item-del:hover { color: var(--red); }
 </style>
 </head>
 <body>
@@ -196,6 +238,28 @@
     <div class="ctx-chip hide" id="ctxChip">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       <span id="ctxLabel">Sin material</span>
+    </div>
+    <button class="back" id="finishBtn" title="Finalizar conversación" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    </button>
+    <button class="back" id="chatsBtn" title="Mis conversaciones">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </button>
+  </div>
+
+  <!-- ░░ PANEL DE CONVERSACIONES (estilo Instagram) ░░ -->
+  <div class="chats-overlay h" id="chatsOverlay">
+    <div class="chats-panel">
+      <div class="chats-panel-header">
+        <span>Tus conversaciones</span>
+        <button class="back" id="closeChatsBtn" title="Cerrar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <button class="chats-new" id="newChatBtn">+ Nueva conversación</button>
+      <div class="chats-list" id="chatsList">
+        <div class="chats-empty">Cargando…</div>
+      </div>
     </div>
   </div>
 
@@ -233,6 +297,7 @@
 
 <script>
   const API = '/api/handler';
+  const CHAT_API = '/api/chat';
   const LS  = 'triskl_session';
 
   // ── Sesión ──
@@ -258,12 +323,13 @@
   const DOC = parseDoc();
 
   // ── Estado del chat ──
-  const conversation = [];   // [{role, content}]
+  const conversation = [];   // [{role, content}] (solo para mostrar; la fuente real es la base)
   let attachments = [];      // [{name, media_type, data(base64)}] pdf/img
   let contextText = '';      // material de texto (transcripción, apuntes, .txt)
   let contextLabel = '';     // etiqueta legible del material cargado
   let materia = null;        // si lo resolvemos desde la sesión/transcripción
   let sending = false;
+  let currentChatId = null;  // conversación activa (persistida en /api/chat)
 
   // ── Helpers de red (uuid + password en cada request) ──
   async function apiPOST(action, body) {
@@ -286,16 +352,33 @@
       return await res.json().catch(() => []);
     } catch (_) { return []; }
   }
+  async function chatPOST(action, body) {
+    try {
+      const res = await fetch(`${CHAT_API}?action=${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ..._auth(), ...(body || {}) })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { error: data.error || `HTTP ${res.status}` };
+      return data;
+    } catch (e) { return { error: e.message }; }
+  }
 
   // ── DOM refs ──
   const threadEl  = document.getElementById('thread');
   const innerEl   = document.getElementById('threadInner');
-  const emptyEl   = document.getElementById('empty');
   const inputEl   = document.getElementById('input');
   const sendEl    = document.getElementById('send');
   const stripEl   = document.getElementById('attachStrip');
   const ctxChip   = document.getElementById('ctxChip');
   const ctxLabel  = document.getElementById('ctxLabel');
+  const chatsBtn      = document.getElementById('chatsBtn');
+  const chatsOverlay  = document.getElementById('chatsOverlay');
+  const chatsList     = document.getElementById('chatsList');
+  const closeChatsBtn = document.getElementById('closeChatsBtn');
+  const newChatBtn    = document.getElementById('newChatBtn');
+  const finishBtn     = document.getElementById('finishBtn');
 
   document.getElementById('backBtn').addEventListener('click', () => { location.href = '/'; });
 
@@ -308,6 +391,91 @@
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2200);
   }
+
+  // ════════════════════════════════════════════════════════
+  // PANEL DE CONVERSACIONES (inbox estilo Instagram) — /api/chat
+  // ════════════════════════════════════════════════════════
+  function fmtChatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso), now = new Date();
+    return d.toDateString() === now.toDateString()
+      ? d.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit' });
+  }
+
+  function updateFinishBtnVisibility() {
+    finishBtn.style.display = currentChatId ? 'grid' : 'none';
+  }
+
+  function openChatsPanel() { chatsOverlay.classList.remove('h'); loadChatsList(); }
+  function closeChatsPanel() { chatsOverlay.classList.add('h'); }
+  chatsBtn.addEventListener('click', openChatsPanel);
+  closeChatsBtn.addEventListener('click', closeChatsPanel);
+  chatsOverlay.addEventListener('click', e => { if (e.target === chatsOverlay) closeChatsPanel(); });
+
+  async function loadChatsList() {
+    chatsList.innerHTML = '<div class="chats-empty">Cargando…</div>';
+    const chats = await chatPOST('ai-chats-list', {});
+    if (!Array.isArray(chats) || !chats.length) {
+      chatsList.innerHTML = '<div class="chats-empty">Todavía no tenés conversaciones con la IA.</div>';
+      return;
+    }
+    chatsList.innerHTML = '';
+    chats.forEach(c => {
+      const item = document.createElement('button');
+      item.className = 'chat-item' + (c.id === currentChatId ? ' active' : '');
+      item.innerHTML = `
+        <div class="chat-item-avatar">IA</div>
+        <div class="chat-item-body">
+          <div class="chat-item-title">${esc(c.title || c.materia || 'Conversación')}<span class="status">${c.closed_at ? '· finalizada' : '· activa'}</span></div>
+          <div class="chat-item-snippet">${esc(c.last_message || 'Sin mensajes aún')} · ${fmtChatDate(c.updated_at)}</div>
+        </div>
+        <span class="chat-item-del" data-del="${c.id}" title="Eliminar">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </span>`;
+      item.querySelector('[data-del]').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm('¿Eliminar esta conversación?')) return;
+        await chatPOST('ai-chat-delete', { chat_id: c.id });
+        if (c.id === currentChatId) startFreshChat();
+        loadChatsList();
+      });
+      item.addEventListener('click', () => openChatById(c.id));
+      chatsList.appendChild(item);
+    });
+  }
+
+  async function openChatById(chatId) {
+    const data = await chatPOST('ai-chat-open', { chat_id: chatId });
+    if (!data || data.error || !data.chat) { toast('No se pudo abrir la conversación', 'err'); return; }
+    currentChatId = data.chat.id;
+    materia = data.chat.materia || materia;
+    conversation.length = 0;
+    innerEl.innerHTML = '';
+    (data.messages || []).forEach(m => {
+      appendMsg(m.role === 'user' ? 'user' : 'bot', m.content);
+      conversation.push({ role: m.role, content: m.content });
+    });
+    updateFinishBtnVisibility();
+    closeChatsPanel();
+  }
+
+  function startFreshChat() {
+    currentChatId = null;
+    conversation.length = 0;
+    innerEl.innerHTML = `<div class="empty" id="empty"><div class="empty-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg></div><h1>Preguntame lo que quieras</h1><p id="emptyText"></p><div class="suggests" id="suggests"></div></div>`;
+    renderSuggests();
+    updateFinishBtnVisibility();
+    closeChatsPanel();
+  }
+  newChatBtn.addEventListener('click', startFreshChat);
+
+  finishBtn.addEventListener('click', async () => {
+    if (!currentChatId) return;
+    await chatPOST('ai-chat-finish', { chat_id: currentChatId });
+    toast('Conversación finalizada');
+    startFreshChat();
+  });
 
   // ── Cargar material del documento (si vino por URL) ──
   async function loadDocContext() {
@@ -408,7 +576,8 @@
 
   // ── Render de mensajes ──
   function appendMsg(role, text, attachNames, pending) {
-    if (emptyEl && emptyEl.parentNode) emptyEl.remove();
+    const stillEmpty = document.getElementById('empty');
+    if (stillEmpty && stillEmpty.parentNode) stillEmpty.remove();
     const wrap = document.createElement('div');
     wrap.className = `msg ${role === 'user' ? 'user' : 'bot'}`;
     const av = role === 'user' ? (SESSION.username || 'Vos')[0].toUpperCase() : 'IA';
@@ -459,14 +628,25 @@
 
     sending = true; sendEl.disabled = true;
 
-    const historyForApi = conversation.slice(0, -1);
-    const r = await apiPOST('ai-chat', {
+    const r = await chatPOST('ai-chat', {
+      chat_id: currentChatId,
       message: question || 'Analizá el material adjunto.',
-      conversationHistory: historyForApi,
       contextText: contextText || undefined,
       attachments: binAttaches.length ? binAttaches : undefined,
       materia: materia || undefined
     });
+
+    if (r && r.error) {
+      const body = pendingEl.querySelector('.body');
+      body.classList.remove('pending');
+      body.textContent = '⚠️ ' + r.error;
+      toast('Error al consultar la IA', 'err');
+      sending = false; sendEl.disabled = false;
+      return;
+    }
+
+    currentChatId = r.chat_id || currentChatId;
+    updateFinishBtnVisibility();
 
     const answer = (r && (r.response || r.reply)) || '⚠️ No pude obtener una respuesta. Probá de nuevo.';
     conversation.push({ role: 'assistant', content: answer });
@@ -494,6 +674,7 @@
 
   // ── Init ──
   loadDocContext();
+  updateFinishBtnVisibility();
   setTimeout(() => inputEl.focus(), 200);
 </script>
 </body>
