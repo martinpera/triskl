@@ -252,6 +252,29 @@
   }
   @keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
   @media(min-width:600px){.modal-overlay{align-items:center;padding:20px;}.modal-sheet{border-radius:24px;}}
+
+  /* ═══ PERFIL DE OTRO — a pantalla completa, estilo X/IG ═══ */
+  #userProfileModal{align-items:stretch;justify-content:stretch;padding:0;background:#fff;backdrop-filter:none;}
+  #userProfileModal .modal-sheet{
+    width:100%;max-width:none;height:100dvh;max-height:100dvh;border-radius:0;
+    box-shadow:none;animation:slideInProf .18s ease both;padding:0;
+  }
+  @keyframes slideInProf{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+  @media(min-width:600px){
+    #userProfileModal{padding:0;}
+    #userProfileModal .modal-sheet{max-width:600px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line);}
+  }
+  #userProfileModal .up-header{
+    display:flex;align-items:center;gap:14px;padding:12px 16px;flex-shrink:0;
+    border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:2;
+  }
+  #userProfileModal .up-header .up-back{
+    width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border:1px solid var(--line);
+    border-radius:10px;background:#fff;color:var(--ink-2);cursor:pointer;
+  }
+  #userProfileModal .up-header .up-back:hover{background:var(--soft-bg,#f6f6f7);}
+  #userProfileModal .up-header .up-htitle{font-size:16px;font-weight:800;letter-spacing:-.3px;}
+  #userProfileModal .up-header .up-hsub{font-size:12px;color:var(--muted);font-weight:600;}
   .modal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
   .modal-title{font-family:var(--display);font-size:19px;font-weight:800;letter-spacing:-.5px;}
   .modal-close{width:32px;height:32px;border-radius:50%;background:var(--soft-bg);border:0;color:var(--ink-2);display:flex;align-items:center;justify-content:center;}
@@ -733,7 +756,7 @@
   </div>
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" data-page="feed">Feed</button>
-    <button class="nav-tab" data-page="materias">Materias</button>
+    <button class="nav-tab" data-page="materias">Transcripciones</button>
     <button class="nav-tab" data-page="transcript">Transcribir</button>
     <button class="nav-tab" data-page="messages">Mensajes</button>
     <button class="nav-tab" data-page="profile">Perfil</button>
@@ -762,7 +785,7 @@
 
   <div class="page" id="page-materias">
     <div class="section-hdr">
-      <div><div class="section-title">Materias</div><div class="section-sub" id="materiasCount">—</div></div>
+      <div><div class="section-title">Transcripciones</div><div class="section-sub" id="materiasCount">—</div></div>
       <div style="display:flex;gap:6px;">
         <button class="btn btn-ghost btn-sm" id="newEventBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Fecha</button>
         <button class="btn btn-primary btn-sm" id="exportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar</button>
@@ -797,18 +820,18 @@
 
 <nav class="botnav">
   <button class="bnav-item active" data-page="feed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg>Feed</button>
-  <button class="bnav-item" data-page="materias"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Materias</button>
+  <button class="bnav-item" data-page="materias"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Transcripciones</button>
   <div class="fab-wrap">
     <div class="fab-menu" id="fabMenu">
       <button class="fab-opt" id="fabGrabar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg><span>Transcribir una clase<small>Grabá y se convierte en texto</small></span></button>
       <button class="fab-opt" id="fabNewPost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg><span>Publicar<small>Un apunte, un texto o una encuesta</small></span></button>
       <button class="fab-opt" id="fabEvento"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Anotar una fecha<small>Prueba, tarea o recordatorio</small></span></button>
       <button class="fab-opt" id="fabNewDM"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Escribirle a alguien<small>Mensaje directo o grupo</small></span></button>
-      <button class="fab-opt" id="fabIA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--ia)"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9z"/></svg><span>Preguntarle a la IA<small>Resume, explica, te toma la lección</small></span></button>
     </div>
     <button class="fab" id="fabBtn" title="Crear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     <div class="fab-bd" id="fabBd"></div>
   </div>
+  <button class="bnav-item" data-page="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--ia)"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9z"/></svg>IA</button>
   <button class="bnav-item" data-page="messages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Mensajes<span class="bdot" id="msgDot"></span></button>
   <button class="bnav-item" data-page="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</button>
 </nav>
@@ -833,7 +856,7 @@
     </button>
     <button class="menu-row" data-menu="materias">
       <div class="menu-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
-      <div class="menu-txt"><div class="menu-t">Materias</div><div class="menu-d">Tus carpetas: transcripciones, apuntes guardados y fechas.</div></div>
+      <div class="menu-txt"><div class="menu-t">Transcripciones</div><div class="menu-d">Tus carpetas: transcripciones, apuntes guardados y fechas.</div></div>
       <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></span>
     </button>
 
@@ -1163,8 +1186,21 @@
   <div class="modal-actions"><button class="btn btn-ghost" id="cancelAddToFolder">Cancelar</button><button class="btn btn-primary" id="confirmAddToFolder">Guardar</button></div>
 </div></div>
 
+<div class="modal-overlay hidden" id="changePasswordModal"><div class="modal-sheet">
+  <div class="modal-hdr"><div class="modal-title">Cambiar contraseña</div><button class="modal-close" id="closeChangePassword"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+  <div class="form-group"><label class="form-label">Contraseña actual</label><input class="form-ctrl" type="password" id="cpCurrent" autocomplete="current-password"></div>
+  <div class="form-group"><label class="form-label">Nueva contraseña</label><input class="form-ctrl" type="password" id="cpNew" autocomplete="new-password" placeholder="Mínimo 6 caracteres"></div>
+  <div class="form-group"><label class="form-label">Confirmar nueva contraseña</label><input class="form-ctrl" type="password" id="cpConfirm" autocomplete="new-password"></div>
+  <div class="modal-status" id="cpStatus"></div>
+  <div class="modal-actions"><button class="btn btn-ghost" id="cancelChangePassword">Cancelar</button><button class="btn btn-primary" id="confirmChangePassword">Cambiar</button></div>
+</div></div>
+
+
 <div class="modal-overlay hidden" id="userProfileModal"><div class="modal-sheet" style="padding:0;overflow:hidden;display:flex;flex-direction:column;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;flex-shrink:0;"><div style="font-size:15px;font-weight:700;" id="upTitle">Perfil</div><button class="modal-close" id="closeUserProfile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+  <div class="up-header">
+    <button class="up-back" id="closeUserProfile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <div><div class="up-htitle" id="upTitle">Perfil</div><div class="up-hsub" id="upHSub"></div></div>
+  </div>
   <div id="upContent" style="overflow-y:auto;flex:1;padding:0 20px 24px;"></div>
 </div></div>
 
@@ -1512,7 +1548,6 @@ document.getElementById('fabNewPost').addEventListener('click',()=>{closeFab();o
 document.getElementById('fabGrabar').addEventListener('click',()=>{closeFab();location.href='/transcript';});
 document.getElementById('fabEvento').addEventListener('click',()=>{closeFab();openEventModal();});
 document.getElementById('fabNewDM').addEventListener('click',()=>{closeFab();openModal('newChatModal');});
-document.getElementById('fabIA').addEventListener('click',()=>{location.href='/chat';});
 
 document.querySelectorAll('.feed-tab').forEach(btn=>btn.addEventListener('click',()=>{
   if(feedTab===btn.dataset.ftab)return;
@@ -2560,6 +2595,7 @@ document.getElementById('confirmImportFeed').addEventListener('click',async()=>{
 // ========== PERFIL DE OTRO ==========
 async function openUserProfile(uid,uname){
   document.getElementById('upTitle').textContent='@'+(uname||'?');
+  document.getElementById('upHSub').textContent='';
   const content=document.getElementById('upContent');
   content.innerHTML='<div class="empty-state"><div class="empty-sub">Cargando…</div></div>';
   openModal('userProfileModal');
@@ -2577,6 +2613,7 @@ async function openUserProfile(uid,uname){
   const userMaterias=[...new Set(pubs.filter(p=>p.post_type==='transcripcion'&&!p.content?.startsWith('!!POST!!')).map(p=>p.materia).filter(Boolean))].sort();
   const words=u?.total_words||0;
   const avBg=avColor(uname||'?');
+  document.getElementById('upHSub').textContent=`${pubs.length} publicación${pubs.length!==1?'es':''}`;
   content.innerHTML=`
     <div class="up-hero">
       <div class="up-av" style="background:${avBg}">${u?.avatar_url?`<img src="${esc(u.avatar_url)}">`:(uname||'?')[0].toUpperCase()}</div>
@@ -3286,9 +3323,15 @@ async function loadProfile(){
       ${!hasPush?`<button class="btn btn-primary btn-sm" id="activarNotisBtn">Activar</button>`:`<button class="btn btn-ghost btn-sm" id="desactivarNotisBtn" style="color:var(--danger);">Desactivar</button>`}
     </div>
     <div class="profile-section"><div class="prof-sec-title">Ranking de la generación</div><div id="lbList"></div></div>
-    <div style="padding:16px;display:flex;flex-direction:column;gap:8px;">
-      <a href="/" class="btn btn-ghost btn-block">Volver al inicio</a>
+    <div class="profile-section"><div class="prof-sec-title">Cuenta</div>
+      <a href="/cambiar-contrasena" class="btn btn-ghost btn-block" style="margin-bottom:8px;justify-content:flex-start;gap:10px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="17" height="17"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Cambiar contraseña
+      </a>
       <button class="btn btn-ghost btn-block" id="logoutBtn" style="color:var(--danger);">Cerrar sesión</button>
+    </div>
+    <div style="padding:4px 16px 16px;">
+      <a href="/" class="btn btn-ghost btn-block" style="color:var(--muted);">Volver al inicio</a>
     </div>`;
   const lbEl=scroll.querySelector('#lbList');
   (Array.isArray(lb)?lb:[]).slice(0,5).forEach((u2,i)=>{
