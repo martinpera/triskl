@@ -5,84 +5,108 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
 <title>triskl — asistente</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #ffffff;
-    --card: #ffffff;
-    --soft-bg: #f6f6f7;
-    --line: #ececee;
-    --line-hi: #dcdce0;
-    --ink: #131314;
-    --ink-2: #5b5b62;
-    --muted: #94949c;
-    --ia: #5b3df5;
-    --ia-soft: rgba(91,61,245,.09);
-    --red: #e5342b;          /* acento de marca */
-    --gold: #b07500;
-    --f: 'Inter', system-ui, -apple-system, sans-serif;
-    --maxw: 760px;
+    /* ── cuaderno de estudio: papel + tinta azul (vos) + tinta verde de corrección (asistente) ── */
+    --paper: #FAF7F1;
+    --paper-card: #FFFFFF;
+    --paper-soft: #F3EEE2;
+    --rule: #E7DFCC;
+    --rule-hi: #D8CDAF;
+    --ink: #221C14;
+    --ink-2: #6C6152;
+    --muted: #A79C88;
+
+    --brand: #B23A2C;              /* rojo ladrillo — solo marca / destructivo */
+    --brand-soft: rgba(178,58,44,.09);
+
+    --pen-user: #24344B;           /* birome azul */
+    --pen-user-soft: rgba(36,52,75,.08);
+
+    --pen-ai: #1F5A52;             /* lápiz/corrección verde del profesor */
+    --pen-ai-soft: rgba(31,90,82,.10);
+
+    --gold: #93650F;
+
+    --f-display: 'Fraunces', Georgia, serif;
+    --f-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --f-mono: 'IBM Plex Mono', 'SFMono-Regular', monospace;
+    --maxw: 720px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
   body {
-    background: var(--bg); color: var(--ink); font-family: var(--f);
+    background: var(--paper); color: var(--ink); font-family: var(--f-body);
     display: flex; flex-direction: column; height: 100dvh; overflow: hidden;
   }
-  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--pen-ai); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
+
+  /* ── Marca: triskel (tres trazos en espiral) ── */
+  .mark { display: block; }
+  .mark path { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
 
   /* ── Top bar ── */
   .top {
     flex-shrink: 0; display: flex; align-items: center; gap: 12px;
-    padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--bg);
+    padding: 13px 16px; border-bottom: 1px solid var(--rule); background: var(--paper-card);
   }
   .back {
     width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center;
-    border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+    border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-card);
     color: var(--ink-2); cursor: pointer; transition: .12s;
   }
-  .back:hover { background: var(--soft-bg); color: var(--ink); }
+  .back:hover { background: var(--paper-soft); color: var(--ink); border-color: var(--rule-hi); }
   .back svg { width: 18px; height: 18px; }
-  .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .brand-dot { width: 9px; height: 9px; border-radius: 3px; background: var(--red); flex-shrink: 0; }
-  .brand-name { font-size: 16px; font-weight: 900; letter-spacing: -.5px; }
-  .brand-sub { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .brand-mark { width: 22px; height: 22px; color: var(--brand); flex-shrink: 0; }
+  .brand-name { font-family: var(--f-display); font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+  .brand-sub { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
   .ctx-chip {
-    margin-left: auto; display: inline-flex; align-items: center; gap: 6px; max-width: 46%;
-    background: var(--ia-soft); color: var(--ia); border: 1px solid rgba(91,61,245,.18);
+    margin-left: auto; display: inline-flex; align-items: center; gap: 6px; max-width: 44%;
+    background: var(--pen-ai-soft); color: var(--pen-ai); border: 1px solid rgba(31,90,82,.2);
     border-radius: 99px; padding: 5px 11px; font-size: 12px; font-weight: 600;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .ctx-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
   .ctx-chip.hide { display: none; }
 
-  /* ── Thread ── */
+  /* ── Hilo de conversación: página de cuaderno ── */
   .thread {
     flex: 1; overflow-y: auto; padding: 22px 16px 8px;
-    display: flex; flex-direction: column; gap: 14px;
+    background-image: linear-gradient(var(--rule) 1px, transparent 1px);
+    background-size: 100% 32px; background-position: 0 4px;
   }
-  .thread-inner { width: 100%; max-width: var(--maxw); margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .thread-inner {
+    position: relative; width: 100%; max-width: var(--maxw); margin: 0 auto;
+    padding-left: 24px; display: flex; flex-direction: column; gap: 16px;
+  }
+  .thread-inner::before {
+    content: ''; position: absolute; top: -6px; bottom: -6px; left: 6px; width: 1.5px;
+    background: rgba(178,58,44,.28);
+  }
   .thread::-webkit-scrollbar { width: 8px; }
-  .thread::-webkit-scrollbar-thumb { background: var(--line-hi); border-radius: 4px; }
+  .thread::-webkit-scrollbar-thumb { background: var(--rule-hi); border-radius: 4px; }
 
   .empty {
     margin: auto; text-align: center; max-width: 420px; padding: 20px;
     display: flex; flex-direction: column; align-items: center; gap: 14px;
   }
   .empty-badge {
-    width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center;
-    background: var(--ia-soft); color: var(--ia);
+    width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center;
+    background: var(--pen-ai-soft); color: var(--pen-ai);
   }
-  .empty-badge svg { width: 26px; height: 26px; }
-  .empty h1 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; }
-  .empty p { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+  .empty-badge svg { width: 28px; height: 28px; }
+  .empty h1 { font-family: var(--f-display); font-size: 22px; font-weight: 600; letter-spacing: -.3px; }
+  .empty p { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
   .suggests { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
   .suggest {
-    background: var(--soft-bg); border: 1px solid var(--line); border-radius: 99px;
+    background: var(--paper-card); border: 1px solid var(--rule); border-radius: 99px;
     padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: var(--ink-2);
-    cursor: pointer; font-family: var(--f); transition: .12s;
+    cursor: pointer; font-family: var(--f-body); transition: .12s;
   }
-  .suggest:hover { background: var(--line); color: var(--ink); }
+  .suggest:hover { background: var(--pen-ai-soft); color: var(--pen-ai); border-color: rgba(31,90,82,.25); }
 
   .msg { display: flex; gap: 10px; max-width: 100%; animation: rise .22s ease; }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -90,174 +114,179 @@
     width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center;
     font-size: 13px; font-weight: 800;
   }
-  .msg.bot .avatar { background: var(--ia); color: #fff; }
-  .msg.user .avatar { background: var(--ink); color: #fff; }
+  .msg.bot .avatar { background: var(--pen-ai); color: #fff; }
+  .msg.bot .avatar svg { width: 16px; height: 16px; }
+  .msg.user .avatar { background: var(--pen-user); color: #fff; }
   .msg .body {
-    font-size: 14.5px; line-height: 1.6; color: var(--ink);
-    padding: 10px 14px; border-radius: 13px; word-wrap: break-word; overflow-wrap: anywhere;
+    font-size: 14.5px; line-height: 1.62; color: var(--ink);
+    padding: 11px 15px; border-radius: 3px 14px 14px 14px; word-wrap: break-word; overflow-wrap: anywhere;
     white-space: pre-wrap;
   }
-  .msg.bot .body { background: var(--soft-bg); border-top-left-radius: 4px; }
+  .msg.bot .body { background: var(--paper-card); border-left: 3px solid var(--pen-ai); box-shadow: 0 1px 2px rgba(34,28,20,.04); }
   .msg.user { flex-direction: row-reverse; }
-  .msg.user .body { background: var(--ia); color: #fff; border-top-right-radius: 4px; }
+  .msg.user .body { background: var(--pen-user); color: #fff; border-radius: 14px 3px 14px 14px; }
   .msg .body.pending { color: var(--muted); font-style: italic; }
   .msg-attaches { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
   .msg-attach {
-    font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.18); color: inherit;
+    font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,.2); color: inherit;
     border-radius: 7px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px;
   }
-  .msg.bot .msg-attach { background: var(--line); color: var(--ink-2); }
+  .msg.bot .msg-attach { background: var(--paper-soft); color: var(--ink-2); }
   .save-note {
     align-self: flex-start; margin-top: 4px; margin-left: 40px;
-    font-size: 12px; font-weight: 600; color: var(--ia); background: var(--ia-soft);
-    border: 1px solid rgba(91,61,245,.18); border-radius: 8px; padding: 4px 10px;
-    cursor: pointer; font-family: var(--f); transition: .12s;
+    font-family: var(--f-mono); font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    color: var(--pen-ai); background: var(--pen-ai-soft);
+    border: 1px solid rgba(31,90,82,.2); border-radius: 8px; padding: 5px 10px;
+    cursor: pointer; transition: .12s; text-transform: uppercase;
   }
-  .save-note:hover { background: rgba(91,61,245,.16); }
-  .save-note.done { color: var(--gold); background: rgba(176,117,0,.08); border-color: rgba(176,117,0,.2); cursor: default; }
+  .save-note:hover { background: rgba(31,90,82,.18); }
+  .save-note.done { color: var(--gold); background: rgba(147,101,15,.09); border-color: rgba(147,101,15,.22); cursor: default; }
 
   /* typing dots */
   .dots { display: inline-flex; gap: 4px; align-items: center; }
-  .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite both; }
+  .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--pen-ai); animation: blink 1.2s infinite both; opacity: .3; }
   .dots span:nth-child(2) { animation-delay: .2s; }
   .dots span:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 
   /* ── Composer ── */
-  .composer { flex-shrink: 0; border-top: 1px solid var(--line); background: var(--bg); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+  .composer { flex-shrink: 0; border-top: 1px solid var(--rule); background: var(--paper-card); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
   .composer-inner { width: 100%; max-width: var(--maxw); margin: 0 auto; }
   .attach-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .attach-strip:empty { display: none; }
   .chip {
-    display: inline-flex; align-items: center; gap: 6px; background: var(--soft-bg);
-    border: 1px solid var(--line); border-radius: 9px; padding: 5px 8px 5px 10px;
+    display: inline-flex; align-items: center; gap: 6px; background: var(--paper-soft);
+    border: 1px solid var(--rule); border-radius: 9px; padding: 5px 8px 5px 10px;
     font-size: 12px; font-weight: 600; color: var(--ink-2); max-width: 220px;
   }
   .chip .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chip .x { cursor: pointer; color: var(--muted); display: grid; place-items: center; }
-  .chip .x:hover { color: var(--red); }
+  .chip .x:hover { color: var(--brand); }
   .chip .x svg { width: 13px; height: 13px; }
   .row { display: flex; align-items: flex-end; gap: 8px; }
   .icon-btn {
     width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center;
-    border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
+    border: 1px solid var(--rule); border-radius: 12px; background: var(--paper-card);
     color: var(--ink-2); cursor: pointer; transition: .12s;
   }
-  .icon-btn:hover { background: var(--soft-bg); color: var(--ink); }
+  .icon-btn:hover { background: var(--paper-soft); color: var(--ink); }
   .icon-btn svg { width: 19px; height: 19px; }
   .field {
     flex: 1; display: flex; align-items: flex-end;
-    border: 1px solid var(--line-hi); border-radius: 14px; background: var(--bg);
+    border: 1.5px solid var(--rule-hi); border-radius: 14px; background: var(--paper);
     padding: 4px 4px 4px 14px; transition: .12s;
   }
-  .field:focus-within { border-color: var(--ia); }
+  .field:focus-within { border-color: var(--pen-ai); background: var(--paper-card); }
   textarea {
     flex: 1; border: 0; outline: 0; resize: none; background: transparent;
-    font-family: var(--f); font-size: 14.5px; color: var(--ink); line-height: 1.5;
+    font-family: var(--f-body); font-size: 14.5px; color: var(--ink); line-height: 1.5;
     max-height: 140px; padding: 8px 0; overflow-y: auto;
   }
   textarea::placeholder { color: var(--muted); }
   .send {
     width: 38px; height: 38px; flex-shrink: 0; display: grid; place-items: center;
-    border: 0; border-radius: 11px; background: var(--ia); color: #fff; cursor: pointer;
+    border: 0; border-radius: 11px; background: var(--pen-ai); color: #fff; cursor: pointer;
     transition: .12s; margin-left: 4px;
   }
-  .send:hover { background: #4930d6; }
+  .send:hover { background: #16453f; }
   .send:disabled { opacity: .4; cursor: default; }
   .send svg { width: 18px; height: 18px; }
-  .hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 7px; }
+  .hint { font-family: var(--f-mono); font-size: 10.5px; color: var(--muted); text-align: center; margin-top: 8px; letter-spacing: .01em; }
 
   .toast {
     position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%);
     background: var(--ink); color: #fff; font-size: 13px; font-weight: 600;
     padding: 10px 16px; border-radius: 11px; z-index: 50; animation: rise .2s ease;
+    box-shadow: 0 6px 20px rgba(34,28,20,.18);
   }
-  .toast.err { background: var(--red); }
+  .toast.err { background: var(--brand); }
 
   @media (max-width: 560px) {
     .brand-sub { display: none; }
     .ctx-chip { max-width: 40%; }
   }
 
-  /* ── Panel de conversaciones (inbox estilo Instagram) ── */
+  /* ── Panel de conversaciones ── */
   .chats-overlay {
-    position: fixed; inset: 0; z-index: 200; background: rgba(19,19,20,.35);
+    position: fixed; inset: 0; z-index: 200; background: rgba(34,28,20,.32);
     display: flex; justify-content: flex-end;
   }
   .chats-overlay.h { display: none; }
   .chats-panel {
-    width: 100%; max-width: 360px; height: 100%; background: var(--card);
+    width: 100%; max-width: 360px; height: 100%; background: var(--paper-card);
     display: flex; flex-direction: column; animation: slideIn .2s ease both;
-    border-left: 1px solid var(--line-hi);
+    border-left: 1px solid var(--rule-hi);
   }
   @keyframes slideIn { from { transform: translateX(24px); opacity: .4; } to { transform: none; opacity: 1; } }
   .chats-panel-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 15px;
+    padding: 14px 16px; border-bottom: 1px solid var(--rule);
+    font-family: var(--f-display); font-weight: 600; font-size: 17px;
   }
   .chats-new {
     margin: 12px 16px 4px; padding: 10px; border: none; border-radius: 12px;
-    background: var(--ia); color: #fff; font-weight: 700; font-size: 13.5px;
-    cursor: pointer; font-family: var(--f);
+    background: var(--pen-ai); color: #fff; font-weight: 700; font-size: 13.5px;
+    cursor: pointer; font-family: var(--f-body);
   }
-  .chats-new:hover { background: #4930d6; }
+  .chats-new:hover { background: #16453f; }
   .chats-list { flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
   .chats-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 20px; }
   .chat-item {
     display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px;
     cursor: pointer; border: none; background: none; width: 100%; text-align: left;
   }
-  .chat-item:hover, .chat-item.active { background: var(--soft-bg); }
+  .chat-item:hover, .chat-item.active { background: var(--paper-soft); }
   .chat-item-avatar {
-    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; background: var(--ia); color: #fff;
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; background: var(--pen-ai); color: #fff;
     display: grid; place-items: center; font-weight: 800; font-size: 13px;
   }
+  .chat-item-avatar svg { width: 18px; height: 18px; }
   .chat-item-body { flex: 1; min-width: 0; }
   .chat-item-title { font-size: 13.5px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 6px; }
-  .chat-item-title .status { font-size: 10px; font-weight: 600; color: var(--muted); }
+  .chat-item-title .status { font-family: var(--f-mono); font-size: 9.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
   .chat-item-snippet { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chat-item-del {
     flex-shrink: 0; border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 6px;
   }
-  .chat-item-del:hover { color: var(--red); }
+  .chat-item-del:hover { color: var(--brand); }
 
-  /* ── Selector de contexto (apuntes / transcripciones / todo) ── */
+  /* ── Selector de contexto ── */
   .ctx-overlay {
-    position: fixed; inset: 0; z-index: 250; background: rgba(19,19,20,.35);
+    position: fixed; inset: 0; z-index: 250; background: rgba(34,28,20,.32);
     display: flex; align-items: flex-end; justify-content: center;
   }
   .ctx-overlay.h { display: none; }
   .ctx-sheet {
-    width: 100%; max-width: 480px; max-height: 78vh; background: var(--card);
+    width: 100%; max-width: 480px; max-height: 78vh; background: var(--paper-card);
     border-radius: 20px 20px 0 0; display: flex; flex-direction: column;
-    animation: slideUp .2s ease both; border: 1px solid var(--line-hi); border-bottom: 0;
+    animation: slideUp .2s ease both; border: 1px solid var(--rule-hi); border-bottom: 0;
   }
   @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
   @media (min-width: 540px) {
     .ctx-overlay { align-items: center; }
-    .ctx-sheet { border-radius: 20px; border-bottom: 1px solid var(--line-hi); }
+    .ctx-sheet { border-radius: 20px; border-bottom: 1px solid var(--rule-hi); }
   }
-  .ctx-sheet-header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 15px; }
+  .ctx-sheet-header { display: flex; align-items: center; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--rule); font-family: var(--f-display); font-weight: 600; font-size: 17px; }
   .ctx-sheet-header span { flex: 1; }
   .ctx-body { flex: 1; overflow-y: auto; padding: 6px 10px; }
-  .ctx-footer { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+  .ctx-footer { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--rule); }
   .ctx-footer.h { display: none; }
   .ctx-menu-item {
     display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
     padding: 12px 10px; border: none; background: none; border-radius: 12px;
-    cursor: pointer; font-family: var(--f); font-size: 13.5px; font-weight: 700; color: var(--ink);
+    cursor: pointer; font-family: var(--f-body); font-size: 13.5px; font-weight: 700; color: var(--ink);
   }
-  .ctx-menu-item:hover { background: var(--soft-bg); }
-  .ctx-menu-item svg { width: 19px; height: 19px; color: var(--ia); flex-shrink: 0; }
+  .ctx-menu-item:hover { background: var(--paper-soft); }
+  .ctx-menu-item svg { width: 19px; height: 19px; color: var(--pen-ai); flex-shrink: 0; }
   .ctx-menu-item .lbl small { display: block; font-weight: 500; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
   .ctx-list-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; cursor: pointer; }
-  .ctx-list-item:hover { background: var(--soft-bg); }
-  .ctx-list-item input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--ia); }
+  .ctx-list-item:hover { background: var(--paper-soft); }
+  .ctx-list-item input[type=checkbox], .ctx-list-item input[type=radio] { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--pen-ai); }
   .ctx-list-body { flex: 1; min-width: 0; }
   .ctx-list-title { font-size: 13px; font-weight: 700; }
   .ctx-list-snippet { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ctx-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 20px; }
-  .chip.ctx { background: var(--ia-soft); border-color: rgba(91,61,245,.18); color: var(--ia); }
+  .chip.ctx { background: var(--pen-ai-soft); border-color: rgba(31,90,82,.2); color: var(--pen-ai); }
 </style>
 </head>
 <body>
@@ -267,10 +296,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
     <div class="brand">
-      <span class="brand-dot"></span>
+      <svg class="brand-mark mark" viewBox="0 0 48 48"><path d="M24 24 C24 14 16 10 10 14" transform="rotate(0 24 24)"/><path d="M24 24 C24 14 16 10 10 14" transform="rotate(120 24 24)"/><path d="M24 24 C24 14 16 10 10 14" transform="rotate(240 24 24)"/></svg>
       <div>
         <div class="brand-name">triskl</div>
-        <div class="brand-sub">asistente de estudio</div>
+        <div class="brand-sub">Asistente de estudio</div>
       </div>
     </div>
     <div class="ctx-chip hide" id="ctxChip">
@@ -285,7 +314,7 @@
     </button>
   </div>
 
-  <!-- ░░ PANEL DE CONVERSACIONES (estilo Instagram) ░░ -->
+  <!-- ░░ PANEL DE CONVERSACIONES ░░ -->
   <div class="chats-overlay h" id="chatsOverlay">
     <div class="chats-panel">
       <div class="chats-panel-header">
@@ -305,9 +334,9 @@
     <div class="thread-inner" id="threadInner">
       <div class="empty" id="empty">
         <div class="empty-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>
+          <svg class="mark" viewBox="0 0 48 48"><path d="M24 24 C24 14 16 10 10 14" transform="rotate(0 24 24)"/><path d="M24 24 C24 14 16 10 10 14" transform="rotate(120 24 24)"/><path d="M24 24 C24 14 16 10 10 14" transform="rotate(240 24 24)"/></svg>
         </div>
-        <h1>Preguntame lo que quieras</h1>
+        <h1>¿Qué estudiamos hoy?</h1>
         <p id="emptyText">Puedo explicarte la clase, resumir, armar un esquema o hacerte preguntas de repaso. Adjuntá apuntes, PDFs o imágenes cuando lo necesites.</p>
         <div class="suggests" id="suggests"></div>
       </div>
@@ -328,12 +357,12 @@
           </button>
         </div>
       </div>
-      <div class="hint">Enter para enviar · Shift+Enter para salto de línea</div>
+      <div class="hint">ENTER PARA ENVIAR · SHIFT+ENTER PARA SALTO DE LÍNEA</div>
     </div>
     <input type="file" id="fileInput" multiple accept="image/*,application/pdf,.txt,.md,.csv" style="display:none" />
   </div>
 
-  <!-- ░░ SELECTOR DE CONTEXTO (apuntes / transcripciones / todo) ░░ -->
+  <!-- ░░ SELECTOR DE CONTEXTO ░░ -->
   <div class="ctx-overlay h" id="ctxOverlay">
     <div class="ctx-sheet">
       <div class="ctx-sheet-header">
@@ -356,6 +385,7 @@
   const API = '/api/handler';
   const CHAT_API = '/api/chat';
   const LS  = 'triskl_session';
+  const TRISKEL_SVG = '<svg class="mark" viewBox="0 0 48 48"><path d="M24 24 C24 14 16 10 10 14" transform="rotate(0 24 24)"/><path d="M24 24 C24 14 16 10 10 14" transform="rotate(120 24 24)"/><path d="M24 24 C24 14 16 10 10 14" transform="rotate(240 24 24)"/></svg>';
 
   // ── Sesión ──
   let SESSION = null;
@@ -449,7 +479,7 @@
   }
 
   // ════════════════════════════════════════════════════════
-  // PANEL DE CONVERSACIONES (inbox estilo Instagram) — /api/chat
+  // PANEL DE CONVERSACIONES — /api/chat
   // ════════════════════════════════════════════════════════
   function fmtChatDate(iso) {
     if (!iso) return '';
@@ -481,7 +511,7 @@
       const item = document.createElement('button');
       item.className = 'chat-item' + (c.id === currentChatId ? ' active' : '');
       item.innerHTML = `
-        <div class="chat-item-avatar">IA</div>
+        <div class="chat-item-avatar">${TRISKEL_SVG}</div>
         <div class="chat-item-body">
           <div class="chat-item-title">${esc(c.title || c.materia || 'Conversación')}<span class="status">${c.closed_at ? '· finalizada' : '· activa'}</span></div>
           <div class="chat-item-snippet">${esc(c.last_message || 'Sin mensajes aún')} · ${fmtChatDate(c.updated_at)}</div>
@@ -519,7 +549,7 @@
   function startFreshChat() {
     currentChatId = null;
     conversation.length = 0;
-    innerEl.innerHTML = `<div class="empty" id="empty"><div class="empty-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg></div><h1>Preguntame lo que quieras</h1><p id="emptyText"></p><div class="suggests" id="suggests"></div></div>`;
+    innerEl.innerHTML = `<div class="empty" id="empty"><div class="empty-badge">${TRISKEL_SVG}</div><h1>¿Qué estudiamos hoy?</h1><p id="emptyText"></p><div class="suggests" id="suggests"></div></div>`;
     renderSuggests();
     updateFinishBtnVisibility();
     closeChatsPanel();
@@ -543,7 +573,6 @@
       if (Array.isArray(segs) && segs.length) {
         const text = segs.map(s => s.text).filter(Boolean).join('\n');
         let label = 'Transcripción cargada';
-        // intentar resolver la materia desde las sesiones del usuario
         try {
           const sessions = await apiGET('sessions', `username=${encodeURIComponent(SESSION.username || '')}`);
           const found = (sessions || []).find(s => s.id === DOC.id);
@@ -608,13 +637,12 @@
       attachments.push({ name: file.name, media_type: mt, data });
       renderStrip();
     } else {
-      // texto: lo sumamos como bloque de contexto
       const txt = await readAsText(file);
       addContextBlock(file.name, txt);
     }
   }
 
-  // ── Bloques de contexto (transcripciones, apuntes, archivos de texto) ──
+  // ── Bloques de contexto ──
   function addContextBlock(label, text) {
     contextBlocks.push({ id: (crypto.randomUUID ? crypto.randomUUID() : String(Math.random())), label, text });
     renderStrip();
@@ -654,11 +682,8 @@
     });
   }
 
-
   // ════════════════════════════════════════════════════════
-  // SELECTOR DE CONTEXTO — apunte puntual / transcripción puntual /
-  // varios apuntes de una materia / varias transcripciones de una materia /
-  // todo de una materia / todo lo que tengas.
+  // SELECTOR DE CONTEXTO
   // ════════════════════════════════════════════════════════
   const ctxOverlay   = document.getElementById('ctxOverlay');
   const ctxBody      = document.getElementById('ctxBody');
@@ -668,9 +693,9 @@
   const ctxFooter    = document.getElementById('ctxFooter');
   const ctxConfirmBtn = document.getElementById('ctxConfirmBtn');
 
-  let ctxNavStack = []; // pila de vistas para el botón "volver"
-  let ctxAllSessions = null;     // cache de sesiones (transcripciones) del usuario
-  let ctxAllAnnotations = null;  // cache de apuntes del usuario
+  let ctxNavStack = [];
+  let ctxAllSessions = null;
+  let ctxAllAnnotations = null;
 
   function stripHtml(html) {
     const d = document.createElement('div');
@@ -716,7 +741,6 @@
     ctxFooter.classList.toggle('h', !footer);
   }
 
-  // ── Vista 1: menú principal ──
   function renderCtxMenuView() {
     setCtxView('Agregar contexto', '', { showBack: false });
     const items = [
@@ -743,7 +767,6 @@
     [...ctxBody.querySelectorAll('.ctx-menu-item')].forEach((el, i) => el.addEventListener('click', items[i].action));
   }
 
-  // ── Vista 2: elegir materia ──
   async function goMateriaPicker(mode) {
     setCtxView('Elegí la materia', '<div class="ctx-empty">Cargando…</div>', { showBack: true });
     ctxNavStack.push(renderCtxMenuView);
@@ -770,7 +793,6 @@
     renderItemsView(mode, materia_, items, isTrans, isMulti);
   }
 
-  // ── Vista 3: elegir ítems (apuntes o transcripciones) dentro de una materia ──
   function renderItemsView(mode, materia_, items, isTrans, isMulti) {
     ctxNavStack.push(() => goMateriaPicker(mode));
     const title = isTrans ? `Transcripciones — ${materia_}` : `Apuntes — ${materia_}`;
@@ -846,26 +868,25 @@
     closeCtxOverlay();
   }
 
-
   // ── Render de mensajes ──
   function appendMsg(role, text, attachNames, pending) {
     const stillEmpty = document.getElementById('empty');
     if (stillEmpty && stillEmpty.parentNode) stillEmpty.remove();
     const wrap = document.createElement('div');
     wrap.className = `msg ${role === 'user' ? 'user' : 'bot'}`;
-    const av = role === 'user' ? (SESSION.username || 'Vos')[0].toUpperCase() : 'IA';
+    const avatarHtml = role === 'user' ? esc((SESSION.username || 'Vos')[0].toUpperCase()) : TRISKEL_SVG;
     let attachHtml = '';
     if (attachNames && attachNames.length) {
       attachHtml = `<div class="msg-attaches">${attachNames.map(n => `<span class="msg-attach">📎 ${esc(n)}</span>`).join('')}</div>`;
     }
-    wrap.innerHTML = `<div class="avatar">${esc(av)}</div><div class="body${pending ? ' pending' : ''}">${pending ? '<span class="dots"><span></span><span></span><span></span></span>' : esc(text) + attachHtml}</div>`;
+    wrap.innerHTML = `<div class="avatar">${avatarHtml}</div><div class="body${pending ? ' pending' : ''}">${pending ? '<span class="dots"><span></span><span></span><span></span></span>' : esc(text) + attachHtml}</div>`;
     innerEl.appendChild(wrap);
     threadEl.scrollTop = threadEl.scrollHeight;
     return wrap;
   }
 
   function addSaveButton(afterEl, question, answer) {
-    if (!materia) return; // sin materia no sabemos dónde guardarlo
+    if (!materia) return;
     const btn = document.createElement('button');
     btn.className = 'save-note';
     btn.textContent = 'Guardar como archivo';
@@ -892,7 +913,6 @@
     appendMsg('user', question || '(archivo adjunto)', attachNames);
     inputEl.value = ''; autoGrow();
 
-    // adjuntos binarios (img/pdf) para este turno
     const binAttaches = attachments.filter(a => !a._textOnly).map(a => ({ name: a.name, media_type: a.media_type, data: a.data }));
     attachments = []; renderStrip();
 
