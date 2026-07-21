@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#ffffff">
-    <link rel="icon" href="/logotriskl.png" type="image/png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <link rel="icon" href="/logotriskl.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Chat IA · triskl</title>
     <style>
         /* ─── reset & base ─── */
@@ -472,14 +472,18 @@
             width: 14px;
             height: 14px;
         }
+
+        /* ─── el fix: mensajes bien renderizados ─── */
         .msg-bubble {
             max-width: 78%;
             padding: 11px 15px;
             border-radius: 16px;
             font-size: 14.5px;
             line-height: 1.55;
-            white-space: pre-wrap;
             word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            /* respeta saltos de línea pero no mete saltos raros */
         }
         .msg-row.user .msg-bubble {
             background: var(--ink);
@@ -858,21 +862,6 @@
             background: var(--muted);
             cursor: not-allowed;
         }
-        .badge-attach {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: var(--ia-soft);
-            color: var(--ia);
-            border-radius: 99px;
-            padding: 2px 8px 2px 6px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-        .badge-attach svg {
-            width: 12px;
-            height: 12px;
-        }
 
         /* ─── responsive ─── */
         @media(max-width:760px) {
@@ -929,6 +918,37 @@
             display: none;
             box-shadow: 0 6px 20px rgba(0, 0, 0, .2);
         }
+
+        /* ─── password modal ─── */
+        #pwdModal .modal-sheet {
+            max-width: 380px;
+        }
+        #pwdModal .form-ctrl {
+            font-size: 15px;
+            letter-spacing: 2px;
+        }
+        #pwdModal .modal-status {
+            color: var(--danger);
+            font-weight: 600;
+        }
+        .pwd-input-wrap {
+            position: relative;
+        }
+        .pwd-input-wrap .toggle-pwd {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: 0;
+            color: var(--muted);
+            font-size: 13px;
+            padding: 4px 6px;
+            cursor: pointer;
+        }
+        .pwd-input-wrap .toggle-pwd:hover {
+            color: var(--ink);
+        }
     </style>
 </head>
 <body>
@@ -938,7 +958,7 @@
         <!-- ═══ SIDEBAR ═══ -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-top">
-                <img src="/logotriskl.png" alt="" onerror="this.style.display='none'">
+                <img src="/logotriskl.png" alt="" onerror="this.style.display='none'" />
                 <span class="brand-txt">triskl</span>
                 <span class="brand-tag">IA</span>
             </div>
@@ -946,7 +966,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Nuevo chat
             </button>
-            <div class="sidebar-search"><input type="text" id="chatSearchInput" placeholder="Buscar chats…"></div>
+            <div class="sidebar-search"><input type="text" id="chatSearchInput" placeholder="Buscar chats…" /></div>
             <div class="chat-list" id="chatList"></div>
             <div class="sidebar-user">
                 <div class="av" id="sidebarAv">?</div>
@@ -1026,6 +1046,27 @@
         </div>
     </div>
 
+    <!-- ═══ MODAL: contraseña ═══ -->
+    <div class="modal-overlay hidden" id="pwdModal">
+        <div class="modal-sheet">
+            <div class="modal-hdr">
+                <div class="modal-title">🔐 Verificar contraseña</div>
+                <button class="modal-close" id="closePwdModal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <p style="font-size:13px;color:var(--ink-2);margin-bottom:12px;">Para usar el chat, necesitamos verificar tu identidad con tu contraseña de triskl.</p>
+            <div class="form-label">Contraseña</div>
+            <div class="pwd-input-wrap">
+                <input type="password" class="form-ctrl" id="pwdInput" placeholder="••••••••" autocomplete="current-password" />
+                <button class="toggle-pwd" id="togglePwd" type="button">👁</button>
+            </div>
+            <div class="modal-status" id="pwdStatus"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" id="pwdCancelBtn">Cancelar</button>
+                <button class="btn-confirm" id="pwdConfirmBtn">Continuar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══ TOAST ═══ -->
     <div id="miniToast"></div>
 
@@ -1039,14 +1080,35 @@
         try { SESSION = JSON.parse(localStorage.getItem(LS) || '{}'); } catch (_) { SESSION = {}; }
         const CHATS_LS = `triskl_chats_${SESSION.id || 'anon'}`;
 
-        function apiGet(url) {
-            return fetch(url, { headers: SESSION.jwt ? { Authorization: `Bearer ${SESSION.jwt}` } : {} })
-                .then(r => r.json()).catch(() => []);
+        // Guardamos la contraseña en memoria (no en localStorage) para enviar con cada request.
+        let MEM_PASSWORD = null;
+
+        function apiPost(action, body) {
+            const url = `${API}?action=${encodeURIComponent(action)}`;
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (SESSION.jwt) {
+                headers['Authorization'] = `Bearer ${SESSION.jwt}`;
+            }
+            return fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body),
+            }).then(r => r.json()).catch(() => ({}));
+        }
+
+        function apiGet(action, query) {
+            const qs = query ? '&' + query : '';
+            const url = `${API}?action=${encodeURIComponent(action)}${qs}`;
+            const headers = {};
+            if (SESSION.jwt) {
+                headers['Authorization'] = `Bearer ${SESSION.jwt}`;
+            }
+            return fetch(url, { method: 'GET', headers }).then(r => r.json()).catch(() => []);
         }
 
         const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const fmtDate = iso => iso ? new Date(iso).toLocaleString('es-UY', { day: '2-digit', month: '2-digit',
-            hour: '2-digit', minute: '2-digit' }) : '';
         const fmtDateShort = iso => iso ? new Date(iso).toLocaleString('es-UY', { day: '2-digit', month: '2-digit' }) :
         '';
 
@@ -1083,7 +1145,7 @@
         }
         let chats = loadChats();
         let currentChatId = null;
-        let pendingAttach = null; // { label, text }
+        let pendingAttach = null; // { label, text, size }
 
         function newChat() {
             const c = {
@@ -1233,7 +1295,6 @@
                 <span class="attach-size">${m.attach.size || '📄'}</span>
               `;
                     bubble.appendChild(card);
-                    // espacio entre card y texto
                     if (m.content && m.content.trim()) {
                         const spacer = document.createElement('div');
                         spacer.style.marginTop = '6px';
@@ -1331,7 +1392,6 @@
         }
 
         attachBtn.addEventListener('click', () => {
-            // si ya hay un adjunto pendiente, lo quitamos
             if (pendingAttach) {
                 pendingAttach = null;
                 updateAttachBtn();
@@ -1354,7 +1414,7 @@
 
             const sel = document.getElementById('materiaSel');
             sel.innerHTML = '<option value="">Cargando…</option>';
-            apiGet(`${API}?action=sessions&username=${encodeURIComponent(SESSION.username || '')}`).then(rows => {
+            apiGet('sessions', `username=${encodeURIComponent(SESSION.username || '')}`).then(rows => {
                 _sessions = Array.isArray(rows) ? rows : [];
                 const mats = [...new Set(_sessions.map(s => s.materia).filter(Boolean))].sort();
                 if (!mats.length) { sel.innerHTML = '<option value="">No tenés materias todavía</option>'; return; }
@@ -1401,9 +1461,8 @@
                     list.innerHTML = '<div class="item-pick">Cargando…</div>';
 
                     if (_scope === 'one_apunte') {
-                        const rows = await apiGet(
-                            `${API}?action=annotations&user_id=${SESSION.id}&materia=${encodeURIComponent(_materia)}`
-                            );
+                        const rows = await apiGet('annotations',
+                            `user_id=${SESSION.id}&materia=${encodeURIComponent(_materia)}`);
                         _apuntes = (Array.isArray(rows) ? rows : []).filter(r => r.type !== 'ia');
                         if (!_apuntes.length) {
                             list.innerHTML = '<div class="item-pick">Sin apuntes en esta materia.</div>';
@@ -1468,13 +1527,13 @@
                     text = htmlToPlain(_pickedItem.data.content || '');
                 } else if (_scope === 'one_trans' && _pickedItem) {
                     label = `Transcripción · ${_materia}`;
-                    const segs = await apiGet(
-                        `${API}?action=segments&session_id=${encodeURIComponent(_pickedItem.data.id)}`);
+                    const segs = await apiGet('segments',
+                        `session_id=${encodeURIComponent(_pickedItem.data.id)}`);
                     text = (Array.isArray(segs) ? segs : []).map(g => g.text).join('\n\n');
                 } else if (_scope === 'materia_apuntes') {
                     label = `Todos los apuntes · ${_materia}`;
-                    const rows = await apiGet(
-                        `${API}?action=annotations&user_id=${SESSION.id}&materia=${encodeURIComponent(_materia)}`);
+                    const rows = await apiGet('annotations',
+                        `user_id=${SESSION.id}&materia=${encodeURIComponent(_materia)}`);
                     const apuntes = (Array.isArray(rows) ? rows : []).filter(r => r.type !== 'ia');
                     text = apuntes.map((a, i) =>
                         `APUNTE ${i+1} (${fmtDateShort(a.created_at)}):\n${htmlToPlain(a.content || '')}`
@@ -1484,8 +1543,8 @@
                     const sessions = _sessions.filter(s => s.materia === _materia);
                     const parts = [];
                     for (const s of sessions) {
-                        const segs = await apiGet(
-                            `${API}?action=segments&session_id=${encodeURIComponent(s.id)}`);
+                        const segs = await apiGet('segments',
+                            `session_id=${encodeURIComponent(s.id)}`);
                         parts.push(
                             `SESIÓN (${fmtDateShort(s.started_at)}):\n${(Array.isArray(segs) ? segs : []).map(g => g.text).join('\n')}`
                             );
@@ -1496,14 +1555,14 @@
                     const sessions = _sessions.filter(s => s.materia === _materia);
                     const parts = [];
                     for (const s of sessions) {
-                        const segs = await apiGet(
-                            `${API}?action=segments&session_id=${encodeURIComponent(s.id)}`);
+                        const segs = await apiGet('segments',
+                            `session_id=${encodeURIComponent(s.id)}`);
                         parts.push(
                             `SESIÓN (${fmtDateShort(s.started_at)}):\n${(Array.isArray(segs) ? segs : []).map(g => g.text).join('\n')}`
                             );
                     }
-                    const rows = await apiGet(
-                        `${API}?action=annotations&user_id=${SESSION.id}&materia=${encodeURIComponent(_materia)}`);
+                    const rows = await apiGet('annotations',
+                        `user_id=${SESSION.id}&materia=${encodeURIComponent(_materia)}`);
                     const apuntes = (Array.isArray(rows) ? rows : []).filter(r => r.type !== 'ia');
                     apuntes.forEach((a, i) => parts.push(
                         `APUNTE ${i+1} (${fmtDateShort(a.created_at)}):\n${htmlToPlain(a.content || '')}`));
@@ -1516,7 +1575,6 @@
                     return;
                 }
 
-                // guardar adjunto pendiente
                 const size = text.length > 1000 ? `${Math.round(text.length/1000)}k` : `${text.length} caracteres`;
                 pendingAttach = { label, text, size };
                 updateAttachBtn();
@@ -1530,34 +1588,104 @@
         });
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //  SEND MESSAGE
+        //  PASSWORD MODAL
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        const API_URL = '/api/chat.js';
+        let pwdResolve = null;
+        let pwdReject = null;
+
+        function requestPassword() {
+            return new Promise((resolve, reject) => {
+                pwdResolve = resolve;
+                pwdReject = reject;
+                document.getElementById('pwdModal').classList.remove('hidden');
+                document.getElementById('pwdInput').value = '';
+                document.getElementById('pwdStatus').textContent = '';
+                document.getElementById('pwdInput').focus();
+            });
+        }
+
+        document.getElementById('closePwdModal').addEventListener('click', () => {
+            document.getElementById('pwdModal').classList.add('hidden');
+            if (pwdReject) pwdReject(new Error('Cancelado'));
+        });
+        document.getElementById('pwdCancelBtn').addEventListener('click', () => {
+            document.getElementById('pwdModal').classList.add('hidden');
+            if (pwdReject) pwdReject(new Error('Cancelado'));
+        });
+        document.getElementById('pwdConfirmBtn').addEventListener('click', () => {
+            const pwd = document.getElementById('pwdInput').value;
+            if (!pwd) {
+                document.getElementById('pwdStatus').textContent = 'Ingresá tu contraseña.';
+                return;
+            }
+            document.getElementById('pwdModal').classList.add('hidden');
+            if (pwdResolve) pwdResolve(pwd);
+        });
+        document.getElementById('pwdInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                document.getElementById('pwdConfirmBtn').click();
+            }
+        });
+        document.getElementById('togglePwd').addEventListener('click', () => {
+            const inp = document.getElementById('pwdInput');
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //  SEND MESSAGE — con auth por password en memoria
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         let isSending = false;
         const input = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
 
+        // Intenta enviar, pide password si no la tiene en memoria
         async function sendMessage() {
             const text = input.value.trim();
             if (!text && !pendingAttach) return;
             if (isSending) return;
 
+            // Si no tenemos password en memoria, pedirla
+            if (!MEM_PASSWORD) {
+                try {
+                    MEM_PASSWORD = await requestPassword();
+                } catch (_) {
+                    toastMini('Cancelado');
+                    return;
+                }
+                // Verificar que funcione
+                try {
+                    const test = await apiPost('verify-session', {
+                        email: SESSION.email || '',
+                        password: MEM_PASSWORD,
+                        uuid: SESSION.id,
+                        username: SESSION.username,
+                    });
+                    if (test.error) {
+                        MEM_PASSWORD = null;
+                        toastMini('Contraseña incorrecta');
+                        return;
+                    }
+                    // actualizar JWT si vino
+                    if (test.jwt) SESSION.jwt = test.jwt;
+                } catch (_) {
+                    MEM_PASSWORD = null;
+                    toastMini('Error al verificar');
+                    return;
+                }
+            }
+
             let c = getCurrentChat();
             if (!c) { newChat();
                 c = getCurrentChat(); }
 
-            // construir mensaje
             let userContent = text || '';
             let attachInfo = null;
 
             if (pendingAttach) {
                 attachInfo = { label: pendingAttach.label, size: pendingAttach.size };
-                // si hay texto, se agrega después del adjunto en el mensaje
-                // pero el contenido del adjunto se envía como contexto
                 if (!userContent) userContent = `Adjunto: ${pendingAttach.label}`;
             }
 
-            // guardar mensaje del usuario con el adjunto visual
             const userMsg = {
                 role: 'user',
                 content: userContent,
@@ -1566,7 +1694,6 @@
             };
             c.messages.push(userMsg);
 
-            // si hay adjunto, también lo guardamos como contexto (mensaje oculto)
             if (pendingAttach) {
                 c.messages.push({
                     role: 'user',
@@ -1580,7 +1707,6 @@
                     hidden: true,
                     ts: Date.now()
                 });
-                // limpiamos el adjunto pendiente
                 pendingAttach = null;
                 updateAttachBtn();
             }
@@ -1598,22 +1724,33 @@
             showTyping(true);
 
             try {
-                const conversationHistory = c.messages.filter(m => !m.hidden).map(m => ({ role: m.role,
-                    content: m.content }));
-                const payload = {
+                // Construir historial para el LLM (solo mensajes visibles)
+                const conversationHistory = c.messages.filter(m => !m.hidden).map(m => ({
+                    role: m.role,
+                    content: m.content
+                }));
+
+                // Llamar al handler con acción "chat"
+                const body = {
+                    action: 'chat',
+                    uuid: SESSION.id,
+                    username: SESSION.username,
+                    password: MEM_PASSWORD,
                     message: userContent,
                     conversationHistory,
-                    context: c.context || null
+                    context: c.context || null,
                 };
-                const response = await fetch(API_URL, {
+                const resp = await fetch(`${API}?action=chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(body),
                 });
-                let data;
-                try { data = await response.json(); } catch (e) { const t = await response.text(); throw new Error(
-                        `Respuesta no JSON: ${t}`); }
-                if (!response.ok) throw new Error(data.error || `Error ${response.status}`);
+                const data = await resp.json().catch(() => ({}));
+
+                if (!resp.ok || data.error) {
+                    throw new Error(data.error || `Error ${resp.status}`);
+                }
+
                 const assistantContent = data.response || '⚠️ No se recibió respuesta.';
                 c.messages.push({ role: 'assistant', content: assistantContent, ts: Date.now() });
                 c.updated_at = new Date().toISOString();
@@ -1621,6 +1758,11 @@
                 renderChatList();
             } catch (err) {
                 console.error('Error al enviar mensaje:', err);
+                // Si el error es de autenticación, limpiar password para que la pida de nuevo
+                if (err.message && (err.message.includes('401') || err.message.includes('auth') || err.message.includes(
+                        'password'))) {
+                    MEM_PASSWORD = null;
+                }
                 c.messages.push({
                     role: 'assistant',
                     content: `❌ ${err.message || 'Error al comunicarse con el servidor. Intenta de nuevo.'}`,
@@ -1678,6 +1820,8 @@
             if (window.innerWidth <= 760) document.getElementById('sidebar').classList.add('collapsed');
             input.focus();
             updateAttachBtn();
+
+            // Si ya tenemos JWT pero no password, no pasa nada — se pedirá al enviar.
         })();
     </script>
 
