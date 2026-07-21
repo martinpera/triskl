@@ -107,7 +107,9 @@ async function supabaseAuthPost(path, body) {
 }
 
 // ─── Auto-refresh ────────────────────────────────────────────────────────────
-async function withAutoRefresh(jwt, refreshToken, fn) {
+// Ahora acepta un `relogin()` opcional: si no hay refresh_token o falla, vuelve
+// a loguearse con uuid+password (el nuevo motor de auth).
+async function withAutoRefresh(jwt, refreshToken, fn, relogin = null) {
   try {
     return await fn(jwt);
   } catch (e) {
@@ -115,19 +117,117 @@ async function withAutoRefresh(jwt, refreshToken, fn) {
     const isExpired =
       msg.includes("JWT expired") ||
       msg.includes("PGRST301") ||
-      msg.includes("invalid JWT");
+      msg.includes("invalid JWT") ||
+      msg.includes("401");
 
-    if (isExpired && refreshToken) {
-      const { ok, data } = await supabaseAuthPost(
-        "/token?grant_type=refresh_token",
-        { refresh_token: refreshToken }
-      );
-      if (ok && data.access_token) {
-        return await fn(data.access_token);
+    if (isExpired) {
+      if (refreshToken) {
+        const { ok, data } = await supabaseAuthPost(
+          "/token?grant_type=refresh_token",
+          { refresh_token: refreshToken }
+        );
+        if (ok && data.access_token) {
+          return await fn(data.access_token);
+        }
+      }
+      if (relogin) {
+        const freshJwt = await relogin();
+        if (freshJwt) return await fn(freshJwt);
       }
     }
     throw e;
   }
+}
+
+// ─── AUTH por uuid + password ────────────────────────────────────────────────
+// Motor de auth: el cliente manda `uuid` (= id del usuario) y `password` en el
+// body en CADA request. El server busca el email, hace login contra Supabase y
+// usa ese JWT internamente (así siguen valiendo las RLS). Se cachea en memoria
+// mientras la lambda esté caliente para no re-loguear en cada llamada.
+const _sessCache = new Map(); // key: `${uuid}:${password}` -> { jwt, refreshToken, expiresAt, user }
+
+async function loginByUuidPassword(uuid, password) {
+  // Aún no tenemos JWT, así que buscamos el email con service role.
+  const rows = await sbAdminGet(
+    "triskl_users",
+    `id=eq.${uuid}&select=id,username,email,gen`
+  ).catch(() => []);
+  if (!rows || !rows.length || !rows[0].email) {
+    throw new Error("Usuario no encontrado");
+  }
+  const email = rows[0].email;
+  const { ok, data } = await supabaseAuthPost("/token?grant_type=password", { email, password });
+  if (!ok || !data.access_token) {
+    throw new Error("Credenciales incorrectas");
+  }
+  return {
+    jwt: data.access_token,
+    refreshToken: data.refresh_token || null,
+    expiresAt: data.expires_at ? data.expires_at * 1000 : Date.now() + 3500 * 1000,
+    user: { id: rows[0].id, username: rows[0].username, email, gen: rows[0].gen ?? null },
+  };
+}
+
+function _mkAuthCtx(uuid, password, sess) {
+  return {
+    jwt: sess.jwt,
+    refreshToken: sess.refreshToken,
+    user: sess.user,
+    // Se usa desde withAutoRefresh si el JWT cacheado ya venció.
+    relogin: async () => {
+      const fresh = await loginByUuidPassword(uuid, password).catch(() => null);
+      if (fresh) { _sessCache.set(`${uuid}:${password}`, fresh); return fresh.jwt; }
+      return null;
+    },
+  };
+}
+
+// Devuelve el contexto de auth, o null si no vinieron uuid+password
+// (en ese caso el handler usa el JWT del header, flujo legacy).
+async function resolveAuth(req) {
+  const b = req.body || {};
+  const uuid = b.uuid || b.user_id || b.id || null;
+  const password = b.password || null;
+  if (!uuid || !password) return null;
+
+  const key = `${uuid}:${password}`;
+  const cached = _sessCache.get(key);
+  if (cached && cached.expiresAt > Date.now() + 60_000) {
+    return _mkAuthCtx(uuid, password, cached);
+  }
+  const sess = await loginByUuidPassword(uuid, password);
+  _sessCache.set(key, sess);
+  return _mkAuthCtx(uuid, password, sess);
+}
+
+// ─── LLM (Anthropic por defecto) ─────────────────────────────────────────────
+// Todo el proveedor de IA vive acá. Para cambiar a otro (OpenAI, Groq, etc.)
+// tocás SOLO esta función.
+const AI_KEY   = process.env.ANTHROPIC_KEY || process.env.CLAUDE_KEY || "";
+const AI_MODEL = process.env.AI_MODEL || "claude-sonnet-4-5";
+
+async function callLLM({ system, messages, maxTokens = 1200 }) {
+  if (!AI_KEY) throw new Error("Falta ANTHROPIC_KEY en variables de entorno");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": AI_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ model: AI_MODEL, max_tokens: maxTokens, system, messages }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`LLM ${res.status}: ${t.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const text = (data.content || [])
+    .filter(b => b.type === "text")
+    .map(b => b.text)
+    .join("\n")
+    .trim();
+  return text || "No obtuve respuesta.";
 }
 
 // ─── Lógica de negocio ───────────────────────────────────────────────────────
@@ -186,11 +286,15 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Refresh-Token");
   if (req.method === "OPTIONS") return res.status(204).end();
 
-  const action       = req.query.action || (req.body && req.body.action) || "";
-  const jwt          = (req.headers.authorization || "").replace("Bearer ", "") || null;
-  const refreshToken = req.headers["x-refresh-token"] || null;
+  const action = req.query.action || (req.body && req.body.action) || "";
 
-  const auto = (fn) => withAutoRefresh(jwt, refreshToken, fn);
+  // Motor de auth: uuid + password por POST. Fallback al JWT del header (legacy).
+  const authCtx = await resolveAuth(req).catch(() => null);
+  const jwt          = authCtx?.jwt          || (req.headers.authorization || "").replace("Bearer ", "") || null;
+  const refreshToken = authCtx?.refreshToken || req.headers["x-refresh-token"] || null;
+  const relogin      = authCtx?.relogin      || null;
+
+  const auto = (fn) => withAutoRefresh(jwt, refreshToken, fn, relogin);
 
   try {
 
@@ -1205,6 +1309,129 @@ export default async function handler(req, res) {
       if (!session_id) return res.status(400).json({ error: "session_id requerido" });
       await auto(j => sbDelete("segments", `session_id=eq.${session_id}`, j));
       return res.status(200).json({ ok: true });
+    }
+
+    // ========== ANOTACIONES (notas / esquemas / respuestas IA) ==========
+    if (action === "annotations") {
+      const user_id = req.query.user_id;
+      const materia = req.query.materia;
+      if (!user_id || !materia) return res.status(400).json({ error: "user_id y materia requeridos" });
+      const rows = await auto(j => sbGet("annotations",
+        `user_id=eq.${user_id}&materia=eq.${encodeURIComponent(materia)}&order=created_at.desc`, j));
+      return res.status(200).json(rows || []);
+    }
+
+    if (action === "create-annotation") {
+      const { user_id, username, materia, type, content, drawing_data, ai_question, source_session_id } = req.body;
+      if (!user_id || !materia || !type) return res.status(400).json({ error: "user_id, materia y type requeridos" });
+      const payload = {
+        user_id, username: username || null, materia,
+        type, content: content || null, drawing_data: drawing_data || null,
+        ai_question: ai_question || null, source_session_id: source_session_id || null,
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      };
+      const result = await auto(j => sbPost("annotations", payload, j));
+      const row = Array.isArray(result) ? result[0] : result;
+      return res.status(200).json({ ok: true, annotation: row });
+    }
+
+    if (action === "update-annotation") {
+      const { id, user_id, content, drawing_data } = req.body;
+      if (!id || !user_id) return res.status(400).json({ error: "id y user_id requeridos" });
+      const update = { updated_at: new Date().toISOString() };
+      if (content !== undefined)      update.content      = content;
+      if (drawing_data !== undefined) update.drawing_data = drawing_data;
+      await auto(j => sbPatch("annotations", `id=eq.${id}&user_id=eq.${user_id}`, update, j));
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === "delete-annotation") {
+      const { id, user_id } = req.body;
+      if (!id || !user_id) return res.status(400).json({ error: "id y user_id requeridos" });
+      await auto(j => sbDelete("annotations", `id=eq.${id}&user_id=eq.${user_id}`, j));
+      return res.status(200).json({ ok: true });
+    }
+
+    // ========== CHAT IA (Triskl) ==========
+    if (action === "ai-chat") {
+      // Requiere auth por uuid + password (resolveAuth arriba).
+      if (!authCtx || !authCtx.user) {
+        return res.status(401).json({ error: "uuid y password requeridos" });
+      }
+
+      const {
+        message,              // texto de la última pregunta (compat frontend viejo)
+        messages,             // historial completo [{role, content}] (opcional)
+        conversationHistory,  // compat: historial del frontend viejo
+        context,              // [{title, type, text}] transcripciones / apuntes / material
+        contextText,          // alternativa: un solo string de contexto
+        attachments,          // [{name, media_type, data(base64)}] pdf / imágenes
+        materia,
+      } = req.body;
+
+      // 1) Historial previo
+      let history = [];
+      if (Array.isArray(messages) && messages.length) history = messages.slice();
+      else if (Array.isArray(conversationHistory)) history = conversationHistory.slice();
+
+      // 2) Última pregunta del usuario
+      let userText = message;
+      if (!userText && history.length && history[history.length - 1].role === "user") {
+        userText = history.pop().content;
+      }
+      if (!userText) return res.status(400).json({ error: "Falta el mensaje" });
+
+      // 3) Material adjunto (texto)
+      let materialText = "";
+      if (typeof contextText === "string" && contextText.trim()) {
+        materialText = contextText.trim();
+      } else if (Array.isArray(context) && context.length) {
+        materialText = context
+          .map(c => `### ${(c.title || c.type || "Material")}\n${String(c.text || "").trim()}`)
+          .join("\n\n");
+      }
+
+      // 4) System prompt de Triskl
+      const system = [
+        "Sos el asistente de estudio de Triskl, una plataforma para estudiantes de Uruguay.",
+        "Ayudás a entender la clase: explicás, resumís, hacés esquemas, generás preguntas de repaso y aclarás dudas.",
+        "Respondé en español rioplatense (voseo), claro y directo, sin relleno.",
+        materia ? `Materia actual: ${materia}.` : "",
+        materialText
+          ? "Basá tus respuestas en el MATERIAL provisto (transcripciones, apuntes y archivos). Si algo no está en el material, aclaralo y ofrecé una explicación general marcándola como tal."
+          : "Todavía no hay material adjunto; respondé de forma general y ofrecé ayuda para organizar la clase.",
+      ].filter(Boolean).join("\n");
+
+      // 5) Turno actual: material + adjuntos (pdf/imágenes) + pregunta
+      const userBlocks = [];
+      for (const a of (Array.isArray(attachments) ? attachments : [])) {
+        if (!a || !a.data) continue;
+        const mt = a.media_type || "application/octet-stream";
+        if (mt.startsWith("image/")) {
+          userBlocks.push({ type: "image", source: { type: "base64", media_type: mt, data: a.data } });
+        } else if (mt === "application/pdf") {
+          userBlocks.push({ type: "document", source: { type: "base64", media_type: mt, data: a.data } });
+        }
+      }
+      const preface = materialText ? `MATERIAL DE LA CLASE:\n${materialText}\n\n---\n\n` : "";
+      userBlocks.push({ type: "text", text: `${preface}PREGUNTA: ${userText}` });
+
+      // 6) Mensajes para el LLM
+      const llmMessages = [
+        ...history
+          .filter(m => m && (m.role === "user" || m.role === "assistant") && m.content)
+          .map(m => ({ role: m.role, content: String(m.content) })),
+        { role: "user", content: userBlocks },
+      ];
+
+      try {
+        const replyText = await callLLM({ system, messages: llmMessages });
+        // `response` y `reply` para ser compatible con el frontend actual.
+        return res.status(200).json({ response: replyText, reply: replyText });
+      } catch (err) {
+        console.error("[ai-chat ERROR]", err.message);
+        return res.status(502).json({ error: "No se pudo obtener respuesta de la IA", detail: err.message });
+      }
     }
 
     // ========== BRANDING ==========
