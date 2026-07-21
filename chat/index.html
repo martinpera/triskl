@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title>Chat IA · triskl</title>
     <style>
+        /* ─── reset ─── */
         *,
         *::before,
         *::after {
@@ -478,7 +479,6 @@
             word-break: break-word;
             overflow-wrap: break-word;
         }
-        /* fix: normalizar texto sin romper palabras */
         .msg-bubble .msg-text {
             white-space: pre-wrap;
             word-break: break-word;
@@ -1024,6 +1024,9 @@
         const LS = 'triskl_session';
         let SESSION = {};
         try { SESSION = JSON.parse(localStorage.getItem(LS) || '{}'); } catch (_) { SESSION = {}; }
+        // Guardamos la password en memoria (no en localStorage) si el usuario la ingresa
+        SESSION.password = SESSION.password || null; // se pedirá cuando sea necesario
+
         const CHATS_LS = `triskl_chats_${SESSION.id || 'anon'}`;
 
         // ─── helpers ──────────────────────────────────────────────────────
@@ -1044,11 +1047,41 @@
             return text.slice(0, max) + `\n\n[contenido truncado — ${text.length - max} caracteres más]`;
         }
 
-        // ─── API calls ────────────────────────────────────────────────────
-        function apiHandlerGet(params) {
-            return fetch(`${API_HANDLER}?${params}`, {
-                headers: SESSION.jwt ? { Authorization: `Bearer ${SESSION.jwt}` } : {}
-            }).then(r => r.json()).catch(() => []);
+        // ─── API call al handler con autenticación (POST siempre) ──────
+        async function apiHandlerPost(action, extraData = {}) {
+            // Si no tenemos password, pedirla
+            if (!SESSION.password) {
+                const pwd = prompt('Ingresá tu contraseña para continuar:');
+                if (!pwd) throw new Error('Contraseña requerida');
+                SESSION.password = pwd;
+            }
+
+            const body = {
+                username: SESSION.username || '',
+                uuid: SESSION.id || '',
+                password: SESSION.password,
+                action: action,
+                ...extraData
+            };
+
+            const res = await fetch(API_HANDLER, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(SESSION.jwt ? { Authorization: `Bearer ${SESSION.jwt}` } : {})
+                },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                let errMsg = `HTTP ${res.status}`;
+                try {
+                    const j = await res.json();
+                    if (j.error) errMsg = j.error;
+                } catch (_) {}
+                throw new Error(errMsg);
+            }
+            const text = await res.text();
+            try { return JSON.parse(text); } catch (_) { return text; }
         }
 
         // ─── side bar user ──────────────────────────────────────────────
@@ -1166,14 +1199,12 @@
                 chatTitleEl.blur(); } });
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //  RENDER CHAT — con fix para mensajes "altos"
+        //  RENDER CHAT
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         const IA_SVG =
             `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>`;
 
         function normalizeText(txt) {
-            // Elimina \n que estén entre caracteres (patrón: letra + \n + letra)
-            // pero conserva \n dobles o triples (párrafos)
             if (!txt) return '';
             return txt.replace(/([^\n])\n([^\n])/g, '$1 $2');
         }
@@ -1213,7 +1244,6 @@
                 const bubble = document.createElement('div');
                 bubble.className = 'msg-bubble';
 
-                // ── attach card ──
                 if (m.attach) {
                     const card = document.createElement('div');
                     card.className = 'attach-card';
@@ -1225,7 +1255,6 @@
                     bubble.appendChild(card);
                 }
 
-                // ── texto del mensaje (normalizado) ──
                 const textEl = document.createElement('div');
                 textEl.className = 'msg-text';
                 const clean = normalizeText(m.content || '');
@@ -1329,7 +1358,7 @@
             openAttachModal();
         });
 
-        function openAttachModal() {
+        async function openAttachModal() {
             document.getElementById('attachModal').classList.remove('hidden');
             document.getElementById('scopeWrap').style.display = 'none';
             document.getElementById('itemWrap').style.display = 'none';
@@ -1342,15 +1371,17 @@
 
             const sel = document.getElementById('materiaSel');
             sel.innerHTML = '<option value="">Cargando…</option>';
-            // usar el handler para obtener sesiones
-            const username = SESSION.username || '';
-            apiHandlerGet(`action=sessions&username=${encodeURIComponent(username)}`).then(rows => {
-                _sessions = Array.isArray(rows) ? rows : [];
+            try {
+                const data = await apiHandlerPost('sessions', { username: SESSION.username || '' });
+                _sessions = Array.isArray(data) ? data : [];
                 const mats = [...new Set(_sessions.map(s => s.materia).filter(Boolean))].sort();
                 if (!mats.length) { sel.innerHTML = '<option value="">No tenés materias todavía</option>'; return; }
                 sel.innerHTML = '<option value="">Elegí una materia…</option>' + mats.map(m =>
                     `<option value="${esc(m)}">${esc(m)}</option>`).join('');
-            });
+            } catch (e) {
+                sel.innerHTML = `<option value="">Error: ${e.message}</option>`;
+                document.getElementById('modalStatus').textContent = 'No se pudieron cargar las materias.';
+            }
         }
 
         function closeAttachModal() {
@@ -1391,35 +1422,39 @@
                     list.innerHTML = '<div class="item-pick">Cargando…</div>';
 
                     if (_scope === 'one_apunte') {
-                        // usar handler: annotations
-                        const user_id = SESSION.id || '';
-                        const rows = await apiHandlerGet(
-                            `action=annotations&user_id=${encodeURIComponent(user_id)}&materia=${encodeURIComponent(_materia)}`
-                            );
-                        _apuntes = (Array.isArray(rows) ? rows : []).filter(r => r.type !== 'ia');
-                        if (!_apuntes.length) {
-                            list.innerHTML = '<div class="item-pick">Sin apuntes en esta materia.</div>';
-                            return;
-                        }
-                        list.innerHTML = '';
-                        _apuntes.forEach(a => {
-                            const name = htmlToPlain(a.content || '').split('\n').map(l => l.trim())
-                                .find(l => l) || 'Apunte sin título';
-                            const el = document.createElement('div');
-                            el.className = 'item-pick';
-                            el.innerHTML =
-                                `${esc(name.slice(0, 60))}<div class="item-pick-sub">${fmtDateShort(a.created_at)}</div>`;
-                            el.addEventListener('click', () => {
-                                document.querySelectorAll('#itemList .item-pick').forEach(x => x
-                                    .classList.remove('active'));
-                                el.classList.add('active');
-                                _pickedItem = { kind: 'apunte', data: a, label: name.slice(0, 60) };
-                                confirmBtn.disabled = false;
+                        try {
+                            const rows = await apiHandlerPost('annotations', {
+                                user_id: SESSION.id || '',
+                                materia: _materia
                             });
-                            list.appendChild(el);
-                        });
+                            _apuntes = (Array.isArray(rows) ? rows : []).filter(r => r.type !== 'ia');
+                            if (!_apuntes.length) {
+                                list.innerHTML = '<div class="item-pick">Sin apuntes en esta materia.</div>';
+                                return;
+                            }
+                            list.innerHTML = '';
+                            _apuntes.forEach(a => {
+                                const name = htmlToPlain(a.content || '').split('\n').map(l => l.trim())
+                                    .find(l => l) || 'Apunte sin título';
+                                const el = document.createElement('div');
+                                el.className = 'item-pick';
+                                el.innerHTML =
+                                    `${esc(name.slice(0, 60))}<div class="item-pick-sub">${fmtDateShort(a.created_at)}</div>`;
+                                el.addEventListener('click', () => {
+                                    document.querySelectorAll('#itemList .item-pick').forEach(x => x
+                                        .classList.remove('active'));
+                                    el.classList.add('active');
+                                    _pickedItem = { kind: 'apunte', data: a, label: name.slice(0,
+                                        60) };
+                                    confirmBtn.disabled = false;
+                                });
+                                list.appendChild(el);
+                            });
+                        } catch (e) {
+                            list.innerHTML = `<div class="item-pick">Error: ${e.message}</div>`;
+                        }
                     } else {
-                        // one_trans: filtrar sesiones por materia
+                        // one_trans
                         const sessions = _sessions.filter(s => s.materia === _materia);
                         if (!sessions.length) {
                             list.innerHTML = '<div class="item-pick">Sin transcripciones en esta materia.</div>';
@@ -1461,15 +1496,14 @@
                     text = htmlToPlain(_pickedItem.data.content || '');
                 } else if (_scope === 'one_trans' && _pickedItem) {
                     label = `Transcripción · ${_materia}`;
-                    const segs = await apiHandlerGet(
-                        `action=segments&session_id=${encodeURIComponent(_pickedItem.data.id)}`);
+                    const segs = await apiHandlerPost('segments', { session_id: _pickedItem.data.id });
                     text = (Array.isArray(segs) ? segs : []).map(g => g.text).join('\n\n');
                 } else if (_scope === 'materia_apuntes') {
                     label = `Todos los apuntes · ${_materia}`;
-                    const user_id = SESSION.id || '';
-                    const rows = await apiHandlerGet(
-                        `action=annotations&user_id=${encodeURIComponent(user_id)}&materia=${encodeURIComponent(_materia)}`
-                        );
+                    const rows = await apiHandlerPost('annotations', {
+                        user_id: SESSION.id || '',
+                        materia: _materia
+                    });
                     const apuntes = (Array.isArray(rows) ? rows : []).filter(r => r.type !== 'ia');
                     text = apuntes.map((a, i) =>
                         `APUNTE ${i+1} (${fmtDateShort(a.created_at)}):\n${htmlToPlain(a.content || '')}`
@@ -1479,8 +1513,7 @@
                     const sessions = _sessions.filter(s => s.materia === _materia);
                     const parts = [];
                     for (const s of sessions) {
-                        const segs = await apiHandlerGet(
-                            `action=segments&session_id=${encodeURIComponent(s.id)}`);
+                        const segs = await apiHandlerPost('segments', { session_id: s.id });
                         parts.push(
                             `SESIÓN (${fmtDateShort(s.started_at)}):\n${(Array.isArray(segs) ? segs : []).map(g => g.text).join('\n')}`
                             );
@@ -1491,16 +1524,15 @@
                     const sessions = _sessions.filter(s => s.materia === _materia);
                     const parts = [];
                     for (const s of sessions) {
-                        const segs = await apiHandlerGet(
-                            `action=segments&session_id=${encodeURIComponent(s.id)}`);
+                        const segs = await apiHandlerPost('segments', { session_id: s.id });
                         parts.push(
                             `SESIÓN (${fmtDateShort(s.started_at)}):\n${(Array.isArray(segs) ? segs : []).map(g => g.text).join('\n')}`
                             );
                     }
-                    const user_id = SESSION.id || '';
-                    const rows = await apiHandlerGet(
-                        `action=annotations&user_id=${encodeURIComponent(user_id)}&materia=${encodeURIComponent(_materia)}`
-                        );
+                    const rows = await apiHandlerPost('annotations', {
+                        user_id: SESSION.id || '',
+                        materia: _materia
+                    });
                     const apuntes = (Array.isArray(rows) ? rows : []).filter(r => r.type !== 'ia');
                     apuntes.forEach((a, i) => parts.push(
                         `APUNTE ${i+1} (${fmtDateShort(a.created_at)}):\n${htmlToPlain(a.content || '')}`));
@@ -1519,7 +1551,7 @@
                 closeAttachModal();
                 toastMini(`📎 ${label} adjuntado`);
             } catch (err) {
-                status.textContent = 'No se pudo preparar el contenido.';
+                status.textContent = `Error: ${err.message}`;
                 document.getElementById('confirmBtn').disabled = false;
                 console.error(err);
             }
