@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 // /api/chat.js — Endpoint dedicado al chat con IA (Triskl).
-// AHORA USA LA IA DE SERVO (SERVO.COM.UY) EN LUGAR DE ANTHROPIC.
+// AHORA USA LA IA DE SERVO (SERVO.COM.UY) SIN SYSTEM PROMPT.
+// El historial es exactamente el mismo que el del endpoint original de Servo.
 // Bloquea palabras prohibidas en mensajes y respuestas.
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -193,32 +194,14 @@ async function resolveAuth(req) {
   return _mkAuthCtx(uuid, password, sess);
 }
 
-// ─── LLM: Ahora usa la API de Servo ────────────────────────────────────────
-async function callServo(system, messages) {
-  // messages: array de { role, content } (user/assistant)
-  // system: string con instrucciones (se pondrá como assistant al inicio)
+// ─── LLM: Ahora usa la API de Servo (sin system prompt) ──────────────────
+async function callServo(userMessage, conversationHistory) {
+  // userMessage: string (el último mensaje del usuario)
+  // conversationHistory: array de { role, content } (historial anterior)
 
-  // Construir historial de conversación para Servo
-  const conversationHistory = [];
-  // Agregar system como primer mensaje del asistente
-  if (system) {
-    conversationHistory.push({ role: 'assistant', content: `Instrucción: ${system}` });
-  }
-  // Agregar historial real (sin el mensaje del usuario actual)
-  for (const m of messages) {
-    if (m.role === 'user' || m.role === 'assistant') {
-      conversationHistory.push({ role: m.role, content: m.content });
-    }
-  }
-  // El último mensaje de 'messages' podría ser el usuario actual, pero lo pasamos aparte.
-  // Extraemos el último mensaje (asumimos que es del usuario) y lo usamos como 'message'.
-  const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
-  const userMessage = (lastMsg && lastMsg.role === 'user') ? lastMsg.content : '';
-
-  // Payload para Servo
   const payload = {
     message: userMessage,
-    conversationHistory: conversationHistory
+    conversationHistory: conversationHistory || []
   };
 
   let retries = 0;
@@ -352,10 +335,7 @@ export default async function handler(req, res) {
       const {
         chat_id,
         message,
-        context,
-        contextText,
-        attachments,
-        materia,
+        // context, contextText, attachments, materia ya no se usan (se ignoran)
       } = req.body;
 
       if (!message) return res.status(400).json({ error: "Falta el mensaje" });
@@ -374,76 +354,55 @@ export default async function handler(req, res) {
         chat = rows && rows[0];
         if (!chat) return res.status(404).json({ error: "Conversación no encontrada" });
       } else {
+        // Si no hay chat_id, se crea uno nuevo con título genérico
         const newChat = {
           id: crypto.randomUUID(), user_id: authCtx.user.id, username,
-          materia: materia || null, title: materia || "Nueva conversación",
+          materia: null, // ya no se usa materia
+          title: "Nueva conversación",
           created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         };
         const created = await auto(j => sbPost("ai_chats", newChat, j));
         chat = Array.isArray(created) ? created[0] : created;
       }
 
-      // 2) Historial real de la conversación
+      // 2) Obtener el historial real de la conversación (sin system ni prefijos)
       const priorMessages = await auto(j => sbGet("ai_chat_messages",
         `chat_id=eq.${chat.id}&order=created_at.asc&select=role,content`, j
       ));
 
-      // 3) Material adjunto (texto)
-      let materialText = "";
-      if (typeof contextText === "string" && contextText.trim()) {
-        materialText = contextText.trim();
-      } else if (Array.isArray(context) && context.length) {
-        materialText = context
-          .map(c => `### ${(c.title || c.type || "Material")}\n${String(c.text || "").trim()}`)
-          .join("\n\n");
-      }
+      // 3) Construir el historial para Servo (exactamente como lo hacía el segundo handler)
+      //    priorMessages ya tiene { role, content } para cada mensaje.
+      const conversationHistory = priorMessages.map(m => ({ role: m.role, content: m.content }));
 
-      // 4) System prompt de Triskl (sin palabras bloqueadas)
-      const system = [
-        "Sos el asistente de estudio de Triskl, una plataforma para estudiantes de Uruguay.",
-        "Ayudás a entender la clase: explicás, resumís, hacés esquemas, generás preguntas de repaso y aclarás dudas.",
-        "Respondé en español rioplatense (voseo), claro y directo, sin relleno.",
-        materia ? `Materia actual: ${materia}.` : "",
-        materialText
-          ? "Basá tus respuestas en el MATERIAL provisto (transcripciones, apuntes y archivos). Si algo no está en el material, aclaralo y ofrecé una explicación general marcándola como tal."
-          : "Todavía no hay material adjunto; respondé de forma general y ofrecé ayuda para organizar la clase.",
-      ].filter(Boolean).join("\n");
-
-      // 5) Construir mensajes para el LLM (historial real + el nuevo mensaje)
-      const llmMessages = [
-        ...(priorMessages || [])
-          .filter(m => m && (m.role === "user" || m.role === "assistant") && m.content)
-          .map(m => ({ role: m.role, content: String(m.content) })),
-        { role: "user", content: message }, // el mensaje actual
-      ];
-
-      // 6) Llamar a la IA de Servo
-      const replyText = await callServo(system, llmMessages);
+      // 4) Llamar a la IA de Servo con el mensaje actual y el historial
+      const replyText = await callServo(message, conversationHistory);
 
       // ── BLOQUEO: verificar que la respuesta no contenga palabras prohibidas ──
-      // (callServo ya reintenta, pero por si acaso hacemos un último chequeo)
       if (blockedRegex.test(replyText)) {
         // Si aún contiene, forzamos un mensaje genérico
-        return res.status(200).json({
-          chat_id: chat.id,
-          response: "Lo siento, no puedo responder a esa pregunta porque contiene términos no permitidos.",
-          reply: "Lo siento, no puedo responder a esa pregunta porque contiene términos no permitidos."
-        });
+        const fallback = "Lo siento, no puedo responder a esa pregunta porque contiene términos no permitidos.";
+        // Guardamos igualmente la respuesta de fallback (opcional, pero evita que se vea la original)
+        const nowIso = new Date().toISOString();
+        await auto(j => sbPost("ai_chat_messages", {
+          id: crypto.randomUUID(), chat_id: chat.id, role: "user", content: message, created_at: nowIso,
+        }, j));
+        await auto(j => sbPost("ai_chat_messages", {
+          id: crypto.randomUUID(), chat_id: chat.id, role: "assistant", content: fallback, created_at: nowIso,
+        }, j));
+        await auto(j => sbPatch("ai_chats", `id=eq.${chat.id}`, {
+          updated_at: nowIso, last_message: fallback.slice(0, 140),
+        }, j)).catch(() => null);
+        return res.status(200).json({ chat_id: chat.id, response: fallback, reply: fallback });
       }
 
+      // 5) Guardar mensaje del usuario y respuesta en la base de datos
       const nowIso = new Date().toISOString();
-
-      // Guardar mensaje del usuario
       await auto(j => sbPost("ai_chat_messages", {
         id: crypto.randomUUID(), chat_id: chat.id, role: "user", content: message, created_at: nowIso,
       }, j));
-
-      // Guardar respuesta del asistente
       await auto(j => sbPost("ai_chat_messages", {
         id: crypto.randomUUID(), chat_id: chat.id, role: "assistant", content: replyText, created_at: nowIso,
       }, j));
-
-      // Actualizar chat
       await auto(j => sbPatch("ai_chats", `id=eq.${chat.id}`, {
         updated_at: nowIso, last_message: replyText.slice(0, 140),
       }, j)).catch(() => null);
