@@ -25,8 +25,8 @@
     --accent:#e8412f;           /* rojo del logo */
     --accent-dk:#c8321f;
     --accent-soft:rgba(232,65,47,.10);
-    --ia:#5b3df5;               /* violeta: solo para IA */
-    --ia-soft:rgba(91,61,245,.09);
+    --violet:#5b3df5;           /* violeta de acento */
+    --violet-soft:rgba(91,61,245,.09);
     --green:#12a150;
     --gold:#b07500;
     --danger:#e01b2e;
@@ -36,7 +36,7 @@
     --white:var(--ink); --soft:var(--ink-2); --dim:var(--soft-bg);
     --border:var(--line); --border-hi:var(--line-hi);
     --accent-glow:var(--accent-soft); --danger-glow:var(--danger-soft);
-    --blue:var(--ink); --purple:var(--ia); --pink:var(--accent);
+    --blue:var(--ink); --purple:var(--violet); --pink:var(--accent);
 
     --shadow:0 1px 2px rgba(19,19,20,.04);
     --shadow-lg:0 16px 44px rgba(19,19,20,.16);
@@ -86,13 +86,6 @@
     background:var(--accent);border:2px solid #fff;display:none;
   }
   .icon-btn .badge.show{display:block;}
-  .ia-chip{
-    display:flex;align-items:center;gap:6px;height:34px;padding:0 12px;
-    border-radius:99px;border:1px solid var(--line-hi);background:#fff;
-    font-size:13px;font-weight:600;color:var(--ia);flex-shrink:0;transition:all .14s;
-  }
-  .ia-chip svg{width:15px;height:15px;}
-  .ia-chip:hover{background:var(--ia-soft);border-color:transparent;}
 
   .page-root{
     position:fixed;top:var(--nav);left:0;right:0;
@@ -175,7 +168,6 @@
     display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--ink);
   }
   .menu-ic svg{width:19px;height:19px;stroke-width:1.9;}
-  .menu-ic.ia{background:var(--ia-soft);color:var(--ia);}
   .menu-ic.red{background:var(--accent-soft);color:var(--accent);}
   .menu-txt{flex:1;min-width:0;}
   .menu-t{font-size:15px;font-weight:700;letter-spacing:-.2px;}
@@ -229,7 +221,7 @@
   .chip-green{background:rgba(18,161,80,.1);color:var(--green);}
   .chip-blue{background:var(--soft-bg);color:var(--ink-2);}
   .chip-gold{background:rgba(176,117,0,.1);color:var(--gold);}
-  .chip-purple{background:var(--ia-soft);color:var(--ia);}
+  .chip-purple{background:var(--violet-soft);color:var(--violet);}
   .av{border-radius:50%;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;overflow:hidden;}
   .av img{width:100%;height:100%;object-fit:cover;}
   .av-sm{width:36px;height:36px;font-size:14px;}
@@ -320,18 +312,6 @@
   .compose-box svg{width:17px;height:17px;color:var(--muted);flex-shrink:0;}
   .compose-placeholder{color:var(--muted);font-size:14px;flex:1;text-align:left;}
 
-  /* tarjeta IA del feed */
-  .ia-card{
-    margin:12px 14px 4px;padding:16px;border-radius:20px;
-    background:linear-gradient(135deg,#f4f1ff,#fff);border:1px solid #e8e3ff;
-    display:flex;align-items:center;gap:14px;
-  }
-  .ia-card-ic{width:44px;height:44px;border-radius:14px;background:var(--ia);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .ia-card-ic svg{width:22px;height:22px;stroke-width:1.8;}
-  .ia-card-t{font-family:var(--display);font-size:16px;font-weight:700;letter-spacing:-.3px;}
-  .ia-card-d{font-size:12.5px;color:var(--ink-2);margin-top:2px;line-height:1.4;}
-  .ia-card .btn{background:var(--ia);color:#fff;flex-shrink:0;}
-  .ia-card .btn:hover{background:#4a2fd6;}
 
   .post-card{
     display:flex;gap:12px;padding:14px 16px;background:var(--surface);
@@ -479,7 +459,7 @@
   }
   .apunte-toolbar button:hover{background:#fff;border-color:var(--line);color:var(--ink);}
   .apunte-toolbar button:active{background:var(--line);}
-  .apunte-toolbar button.tb-active{background:var(--ia-soft);border-color:var(--ia);color:var(--ia);}
+  .apunte-toolbar button.tb-active{background:var(--violet-soft);border-color:var(--violet);color:var(--violet);}
   .apunte-doc-wrap{flex:1;min-height:0;overflow-y:auto;background:var(--soft-bg);border:1px solid var(--line);border-radius:12px;padding:24px 12px;display:flex;justify-content:center;}
   .apunte-doc-wrap::-webkit-scrollbar{width:6px;}
   .apunte-doc-wrap::-webkit-scrollbar-thumb{background:var(--line-hi);border-radius:3px;}
@@ -487,7 +467,7 @@
   .apunte-editor{position:relative;background:#fff;border-radius:4px;padding:40px 44px;min-height:500px;font-size:14.5px;line-height:1.7;outline:none;color:var(--ink);font-family:var(--f);}
   .apunte-editor:empty::before{content:attr(data-placeholder);color:var(--muted);pointer-events:none;}
   .apunte-editor ul,.apunte-editor ol{padding-left:24px;margin:6px 0;}
-  .apunte-editor blockquote{border-left:3px solid var(--ia);padding-left:12px;color:var(--ink-2);margin:8px 0;}
+  .apunte-editor blockquote{border-left:3px solid var(--violet);padding-left:12px;color:var(--ink-2);margin:8px 0;}
   .apunte-editor h1{font-size:24px;font-weight:800;margin:14px 0 8px;}
   .apunte-editor h2{font-size:19px;font-weight:800;margin:12px 0 6px;}
   .apunte-editor h3{font-size:16px;font-weight:700;margin:10px 0 5px;}
@@ -516,13 +496,13 @@
   .canvas-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;flex-shrink:0;}
   .canvas-tool-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0;}
   .canvas-tool-btn svg{width:16px;height:16px;overflow:visible;}
-  .canvas-tool-btn.on{background:var(--ia);border-color:var(--ia);color:#fff;}
+  .canvas-tool-btn.on{background:var(--violet);border-color:var(--violet);color:#fff;}
   .canvas-tool-btn:hover:not(.on){background:var(--soft-bg);}
   .canvas-colors{display:flex;gap:4px;align-items:center;}
   .canvas-color{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;flex-shrink:0;}
   .canvas-color.on{border-color:var(--ink);box-shadow:0 0 0 2px #fff inset;}
   .canvas-width-row{display:flex;align-items:center;gap:6px;margin-left:auto;}
-  .canvas-width-row input[type=range]{width:60px;accent-color:var(--ia);}
+  .canvas-width-row input[type=range]{width:60px;accent-color:var(--violet);}
   .canvas-wrap{flex:1;border:1.5px solid var(--line-hi);border-radius:12px;overflow:hidden;background:#fff;position:relative;touch-action:none;min-height:0;}
   #esquemaSvg{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;}
   #esquemaSvg .diag-shape{cursor:grab;}
@@ -535,11 +515,8 @@
   .canvas-actions button{flex:1;height:40px;border:0;border-radius:10px;font-family:var(--f);font-size:13px;font-weight:700;cursor:pointer;}
   .canvas-actions .btn-clear{background:var(--danger-soft);color:var(--danger);}
   .canvas-actions .btn-clear:hover{background:rgba(224,27,46,.15);}
-  .canvas-actions .btn-save{background:var(--ia);color:#fff;}
+  .canvas-actions .btn-save{background:var(--violet);color:#fff;}
   .canvas-actions .btn-save:hover{background:#4930d6;}
-  .doc-editor-ia{display:flex;align-items:center;gap:5px;height:32px;padding:0 11px;border-radius:99px;border:1px solid var(--line-hi);background:#fff;font-size:12.5px;font-weight:600;color:var(--ia);flex-shrink:0;}
-  .doc-editor-ia svg{width:14px;height:14px;}
-  .doc-editor-ia:hover{background:var(--ia-soft);border-color:transparent;}
   .folder-back{width:36px;height:36px;border-radius:50%;background:none;border:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .folder-back:hover{background:var(--soft-bg);}
   .folder-back svg{width:20px;height:20px;stroke-width:2.2;}
@@ -762,10 +739,6 @@
     <button class="nav-tab" data-page="profile">Perfil</button>
   </div>
   <div class="nav-right">
-    <a href="/chat" class="ia-chip" id="iaTopBtn" title="Chat IA">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9z"/></svg>
-      IA
-    </a>
     <button class="icon-btn" id="searchBtn" title="Buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7.5"/><line x1="21" y1="21" x2="16.8" y2="16.8"/></svg></button>
     <button class="icon-btn" id="notifBtn" title="Notificaciones"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="badge" id="notifDot"></span></button>
     <button class="icon-btn" id="menuBtn" title="Menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg></button>
@@ -792,12 +765,6 @@
       </div>
     </div>
     <div class="scroll-area">
-      <!-- Tarjeta IA -->
-      <div class="ia-card" style="margin:12px 14px 0;">
-        <div class="ia-card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9z"/></svg></div>
-        <div style="flex:1;min-width:0;"><div class="ia-card-t">Chat IA</div><div class="ia-card-d">Resumí una clase, sacate una duda o que te tome la lección.</div></div>
-        <a class="btn btn-sm" href="/chat">Abrir</a>
-      </div>
       <div id="eventsBanner"></div>
       <div class="materias-grid" id="materiasGrid"></div>
     </div>
@@ -831,7 +798,6 @@
     <button class="fab" id="fabBtn" title="Crear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
     <div class="fab-bd" id="fabBd"></div>
   </div>
-  <button class="bnav-item" data-page="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--ia)"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9z"/></svg>IA</button>
   <button class="bnav-item" data-page="messages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Mensajes<span class="bdot" id="msgDot"></span></button>
   <button class="bnav-item" data-page="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Perfil</button>
 </nav>
@@ -847,11 +813,6 @@
     <button class="menu-row" data-menu="transcript">
       <div class="menu-ic red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></div>
       <div class="menu-txt"><div class="menu-t">Transcribir</div><div class="menu-d">Grabá la clase y se pasa a texto sola.</div></div>
-      <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></span>
-    </button>
-    <button class="menu-row" data-menu="chat">
-      <div class="menu-ic ia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9z"/></svg></div>
-      <div class="menu-txt"><div class="menu-t">Chat IA</div><div class="menu-d">Preguntale sobre tus apuntes: resúmenes, dudas, repaso.</div></div>
       <span class="menu-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></span>
     </button>
     <button class="menu-row" data-menu="materias">
@@ -923,9 +884,6 @@
       <div class="doc-editor-sub" id="docEditorMateria">—</div>
     </div>
     <div class="doc-editor-status" id="docEditorStatus"></div>
-    <a href="/chat" class="doc-editor-ia" id="docEditorIA" title="Preguntarle a la IA">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>IA
-    </a>
     <button class="btn btn-ghost btn-sm" id="docEditorDelBtn" style="color:var(--danger);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
   </div>
   <div class="apunte-toolbar" id="docToolbar">
@@ -963,7 +921,7 @@
       <button type="button" data-cmd="removeFormat" title="Quitar formato">⌫</button>
     </div>
     <div class="tb-group">
-      <button type="button" id="docInsertEsquema" title="Insertar esquema" style="color:var(--ia);">
+      <button type="button" id="docInsertEsquema" title="Insertar esquema" style="color:var(--violet);">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="7" height="6" rx="1.2"/><circle cx="17.5" cy="7" r="3.2"/><path d="M10 9.5l4.2 3.2"/><path d="M8 10v6a2 2 0 0 0 2 2h4"/></svg>
       </button>
     </div>
@@ -1089,7 +1047,6 @@
   <div class="fulltext-actions">
     <button class="btn btn-ghost" id="ftCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="3"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copiar</button>
     <button class="btn btn-ghost" id="ftDl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar</button>
-    <a class="btn btn-primary" id="ftIA" href="/chat" style="background:var(--ia);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/></svg>Preguntarle a la IA</a>
   </div>
 </div>
 
@@ -1510,7 +1467,6 @@ function closeAllModals(){
 }
 function showPage(page,skipHistory=false){
   if(page==='transcript'){location.href='/transcript';return;}
-  if(page==='chat'){location.href='/chat';return;}
   if(page==='extra'){location.href='/extra';return;}
   currentPage=page;
   closeAllModals();
@@ -2165,13 +2121,6 @@ document.getElementById('docEditorDelBtn').addEventListener('click',async()=>{
   history.back();
   loadMaterias();
 });
-document.getElementById('docEditorIA').addEventListener('click',function(){
-  try{
-    const content=htmlToText(document.getElementById('docEditorEditor').innerHTML||'');
-    sessionStorage.setItem('triskl_ia_context',JSON.stringify({title:document.getElementById('docEditorTitle').textContent||'',content}));
-  }catch(_){}
-  if(_docId)this.setAttribute('href',`/chat?${_docId}?type=doc`);
-});
 
 // ════════════════════════════════════════════════════════
 // ARMADOR DE ESQUEMAS — idéntico al de transcript, insertando en docEditorEditor
@@ -2800,10 +2749,6 @@ function openSessionFulltext(s,segs){openFulltext({id:s.id,type:'transcripcion',
 document.getElementById('fulltextClose').addEventListener('click',()=>document.getElementById('fulltextSheet').classList.add('hidden'));
 document.getElementById('ftCopy').addEventListener('click',()=>{if(_ftData){navigator.clipboard.writeText(_ftData.isHtml?htmlToText(_ftData.content||''):(_ftData.content||''));toast('Copiado');}});
 document.getElementById('ftDl').addEventListener('click',()=>{if(_ftData)dlFile(`${(_ftData.title||'trans').replace(/\s+/g,'_')}.txt`,`Título: ${_ftData.title||''}\nAutor: @${_ftData.username||''}\n\n${_ftData.isHtml?htmlToText(_ftData.content||''):(_ftData.content||'')}`);});
-document.getElementById('ftIA').addEventListener('click',function(){
-  try{if(_ftData)sessionStorage.setItem('triskl_ia_context',JSON.stringify({title:_ftData.title||'',content:_ftData.isHtml?htmlToText(_ftData.content||''):(_ftData.content||'')}));}catch(_){}
-  if(_ftData&&_ftData.id)this.setAttribute('href',`/chat?${_ftData.id}?type=${_ftData.type||'transcripcion'}`);
-});
 
 // ========== EVENTOS ==========
 async function loadEventsBanner(){
